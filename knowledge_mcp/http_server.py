@@ -15,6 +15,7 @@ Or with uv:
 import hashlib
 import os
 import sys
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -26,6 +27,7 @@ import uvicorn
 from starlette.applications import Starlette
 from starlette.routing import Route, Mount
 from starlette.responses import JSONResponse, HTMLResponse, FileResponse
+from knowledge_mcp import __version__
 from knowledge_mcp.server import mcp
 from knowledge_mcp.config import settings
 from knowledge_mcp.qdrant import QdrantService
@@ -33,6 +35,9 @@ from knowledge_mcp.embeddings import get_embeddings
 
 # Shared Qdrant service for dashboard API
 _qdrant = QdrantService()
+
+# Server start time (epoch seconds)
+_start_time = time.time()
 
 # Path to dashboard directory (sibling of knowledge_mcp package)
 DASHBOARD_DIR = Path(__file__).resolve().parent.parent / "dashboard"
@@ -47,13 +52,19 @@ async def health_check(request):
     """
     Health check endpoint that verifies connectivity to Qdrant and Ollama.
 
-    Returns JSON with status of each component.
+    Returns JSON with status of each component, version, uptime, and
+    collection counts.
     """
+    uptime_seconds = int(time.time() - _start_time)
     health_status = {
         "status": "ok",
+        "version": __version__,
+        "uptime_seconds": uptime_seconds,
         "qdrant": False,
         "ollama": False,
         "model": settings.embedding_model,
+        "vector_size": settings.vector_size,
+        "collections": {},
     }
 
     async with httpx.AsyncClient(timeout=5.0) as client:
@@ -81,6 +92,22 @@ async def health_check(request):
                 health_status["ollama"] = False
         except Exception as e:
             health_status["ollama_error"] = str(e)
+
+    # Collection counts (best-effort)
+    try:
+        await _qdrant.ensure_collections()
+        for name in [
+            settings.knowledge_collection,
+            settings.skills_collection,
+            settings.projects_collection,
+            settings.private_collection,
+        ]:
+            try:
+                health_status["collections"][name] = (await _qdrant.client.count(name)).count
+            except Exception:
+                health_status["collections"][name] = 0
+    except Exception:
+        pass
 
     # Overall status is ok only if both services are healthy
     if not (health_status["qdrant"] and health_status["ollama"]):

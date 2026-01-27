@@ -43,6 +43,7 @@
         .status-indicators {
             display: flex;
             gap: 15px;
+            position: relative;
         }
 
         .status {
@@ -69,6 +70,106 @@
         @keyframes pulse {
             0%, 100% { opacity: 1; }
             50% { opacity: 0.5; }
+        }
+
+        /* Health Panel */
+        .health-toggle {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            padding: 6px 12px;
+            background: #1a1a1a;
+            border-radius: 6px;
+            border: 1px solid #2a2a2a;
+            font-size: 13px;
+            color: #e0e0e0;
+            transition: border-color 0.2s;
+            user-select: none;
+        }
+
+        .health-toggle:hover {
+            border-color: #3b82f6;
+        }
+
+        .health-toggle .chevron {
+            font-size: 10px;
+            transition: transform 0.2s;
+            color: #888;
+        }
+
+        .health-toggle.expanded .chevron {
+            transform: rotate(180deg);
+        }
+
+        .health-panel {
+            display: none;
+            position: absolute;
+            top: calc(100% + 10px);
+            right: 0;
+            width: 420px;
+            background: #1a1a1a;
+            border: 1px solid #2a2a2a;
+            border-radius: 12px;
+            padding: 20px;
+            z-index: 100;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+        }
+
+        .health-panel.open {
+            display: block;
+            animation: fadeIn 0.15s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .health-section {
+            margin-bottom: 16px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid #2a2a2a;
+        }
+
+        .health-section:last-child {
+            margin-bottom: 0;
+            padding-bottom: 0;
+            border-bottom: none;
+        }
+
+        .health-section-title {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #666;
+            margin-bottom: 8px;
+        }
+
+        .health-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 4px 0;
+            font-size: 13px;
+        }
+
+        .health-row .label {
+            color: #888;
+        }
+
+        .health-row .value {
+            color: #e0e0e0;
+            font-family: monospace;
+            font-size: 12px;
+        }
+
+        .health-row .value.ok {
+            color: #22c55e;
+        }
+
+        .health-row .value.err {
+            color: #ef4444;
         }
 
         .grid {
@@ -674,20 +775,75 @@
             <h1>Knowledge MCP Dashboard</h1>
             <div class="status-indicators">
                 <div class="status">
-                    <span class="status-dot checking" id="status-rest"></span>
-                    <span>REST API</span>
-                </div>
-                <div class="status">
-                    <span class="status-dot checking" id="status-mcp"></span>
-                    <span>MCP Server</span>
-                </div>
-                <div class="status">
                     <span class="status-dot checking" id="status-qdrant"></span>
                     <span>Qdrant</span>
                 </div>
                 <div class="status">
                     <span class="status-dot checking" id="status-ollama"></span>
                     <span>Ollama</span>
+                </div>
+                <div class="health-toggle" id="health-toggle" onclick="toggleHealthPanel()">
+                    <span class="status-dot checking" id="status-overall"></span>
+                    <span id="health-toggle-label">System</span>
+                    <span class="chevron">&#9660;</span>
+                </div>
+                <div class="health-panel" id="health-panel">
+                    <div class="health-section">
+                        <div class="health-section-title">Server</div>
+                        <div class="health-row">
+                            <span class="label">Version</span>
+                            <span class="value" id="hp-version">--</span>
+                        </div>
+                        <div class="health-row">
+                            <span class="label">Uptime</span>
+                            <span class="value" id="hp-uptime">--</span>
+                        </div>
+                    </div>
+                    <div class="health-section">
+                        <div class="health-section-title">Qdrant</div>
+                        <div class="health-row">
+                            <span class="label">Status</span>
+                            <span class="value" id="hp-qdrant-status">--</span>
+                        </div>
+                        <div class="health-row">
+                            <span class="label">Collections</span>
+                            <span class="value" id="hp-qdrant-collections">--</span>
+                        </div>
+                    </div>
+                    <div class="health-section">
+                        <div class="health-section-title">Ollama</div>
+                        <div class="health-row">
+                            <span class="label">Status</span>
+                            <span class="value" id="hp-ollama-status">--</span>
+                        </div>
+                        <div class="health-row">
+                            <span class="label">Model</span>
+                            <span class="value" id="hp-ollama-model">--</span>
+                        </div>
+                        <div class="health-row">
+                            <span class="label">Vector size</span>
+                            <span class="value" id="hp-vector-size">--</span>
+                        </div>
+                    </div>
+                    <div class="health-section">
+                        <div class="health-section-title">Storage</div>
+                        <div class="health-row">
+                            <span class="label">Knowledge</span>
+                            <span class="value" id="hp-col-knowledge">--</span>
+                        </div>
+                        <div class="health-row">
+                            <span class="label">Skills</span>
+                            <span class="value" id="hp-col-skills">--</span>
+                        </div>
+                        <div class="health-row">
+                            <span class="label">Projects</span>
+                            <span class="value" id="hp-col-projects">--</span>
+                        </div>
+                        <div class="health-row">
+                            <span class="label">Private</span>
+                            <span class="value" id="hp-col-private">--</span>
+                        </div>
+                    </div>
                 </div>
             </div>
         </header>
@@ -985,6 +1141,37 @@
         let searchTimeout = null;
         let activeCollection = 'knowledge';
 
+        // Health panel toggle
+        function toggleHealthPanel() {
+            const panel = document.getElementById('health-panel');
+            const toggle = document.getElementById('health-toggle');
+            const isOpen = panel.classList.toggle('open');
+            toggle.classList.toggle('expanded', isOpen);
+        }
+
+        // Close health panel when clicking outside
+        document.addEventListener('click', (e) => {
+            const panel = document.getElementById('health-panel');
+            const toggle = document.getElementById('health-toggle');
+            if (!toggle.contains(e.target) && !panel.contains(e.target)) {
+                panel.classList.remove('open');
+                toggle.classList.remove('expanded');
+            }
+        });
+
+        function formatUptime(seconds) {
+            const d = Math.floor(seconds / 86400);
+            const h = Math.floor((seconds % 86400) / 3600);
+            const m = Math.floor((seconds % 3600) / 60);
+            const s = seconds % 60;
+            const parts = [];
+            if (d > 0) parts.push(d + 'd');
+            if (h > 0) parts.push(h + 'h');
+            if (m > 0) parts.push(m + 'm');
+            parts.push(s + 's');
+            return parts.join(' ');
+        }
+
         // Check services status via /health endpoint
         async function checkStatus() {
             try {
@@ -992,22 +1179,52 @@
                 const data = await res.json();
 
                 const isUp = data.status === 'ok' || data.status === 'degraded';
-                setStatus('rest', isUp);
-                setStatus('mcp', isUp);
                 setStatus('qdrant', data.qdrant);
                 setStatus('ollama', data.ollama);
+                setStatus('overall', data.qdrant && data.ollama);
+
+                // Populate health panel
+                setText('hp-version', data.version || '--');
+                setText('hp-uptime', data.uptime_seconds != null ? formatUptime(data.uptime_seconds) : '--');
+
+                setStatusText('hp-qdrant-status', data.qdrant);
+                const cols = data.collections || {};
+                const colNames = Object.keys(cols);
+                setText('hp-qdrant-collections', colNames.length > 0 ? colNames.join(', ') : '--');
+
+                setStatusText('hp-ollama-status', data.ollama);
+                setText('hp-ollama-model', data.model || '--');
+                setText('hp-vector-size', data.vector_size != null ? String(data.vector_size) : '--');
+
+                setText('hp-col-knowledge', String(cols.knowledge ?? '--'));
+                setText('hp-col-skills', String(cols.skills ?? '--'));
+                setText('hp-col-projects', String(cols.projects ?? '--'));
+                setText('hp-col-private', String(cols.private ?? '--'));
             } catch {
-                setStatus('rest', false);
-                setStatus('mcp', false);
                 setStatus('qdrant', false);
                 setStatus('ollama', false);
+                setStatus('overall', false);
             }
         }
 
         function setStatus(service, online) {
             const dot = document.getElementById(`status-${service}`);
+            if (!dot) return;
             dot.classList.remove('checking', 'online', 'offline');
             dot.classList.add(online ? 'online' : 'offline');
+        }
+
+        function setText(id, text) {
+            const el = document.getElementById(id);
+            if (el) el.textContent = text;
+        }
+
+        function setStatusText(id, ok) {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.textContent = ok ? 'Connected' : 'Disconnected';
+            el.classList.remove('ok', 'err');
+            el.classList.add(ok ? 'ok' : 'err');
         }
 
         // Collection tab switching
