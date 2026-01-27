@@ -9,10 +9,8 @@ Usage:
 
 import asyncio
 import sys
-import os
 import re
 from pathlib import Path
-from typing import Optional
 
 # Add parent dir to path for imports
 sys.path.insert(0, str(Path(__file__).parent))
