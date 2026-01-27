@@ -81,16 +81,16 @@ services:
 ## Phase 3: Documentation (Priority: HIGH)
 
 ### 3.1 README.md (English)
-- [ ] Project description + badges (license, Docker pulls, etc.)
-- [ ] Architecture diagram (ASCII or Mermaid)
-- [ ] **Quick Start** — `docker compose up` in 3 commands
-- [ ] **Configuration Reference** — all env vars with defaults
-- [ ] **MCP Tools Reference** — all 24 tools with descriptions
-- [ ] **Usage with Claude Code** — how to add to `~/.claude/mcp.json`
-- [ ] **Usage with other clients** — OpenCode, generic MCP
-- [ ] **Advanced** — external Qdrant, custom embedding models, importing skills
-- [ ] **Development** — local setup, running tests
-- [ ] **Contributing** section
+- [x] Project description + badges (license, Docker pulls, etc.)
+- [x] Architecture diagram (ASCII or Mermaid)
+- [x] **Quick Start** — `docker compose up` in 3 commands
+- [x] **Configuration Reference** — all env vars with defaults
+- [x] **MCP Tools Reference** — all 24 tools with descriptions
+- [x] **Usage with Claude Code** — how to add to `~/.claude/mcp.json`
+- [x] **Usage with other clients** — OpenCode, generic MCP
+- [x] **Advanced** — external Qdrant, custom embedding models, importing skills
+- [x] **Development** — local setup, running tests
+- [x] **Contributing** section
 
 ### 3.2 .env.example
 ```env
@@ -111,8 +111,8 @@ MCP_PORT=8765
 ```
 
 ### 3.3 API.md
-- [ ] Review existing `API.md` — update or merge into README
-- [ ] Document MCP tool schemas (inputs/outputs)
+- [x] Review existing `API.md` — update or merge into README
+- [x] Document MCP tool schemas (inputs/outputs)
 
 ---
 

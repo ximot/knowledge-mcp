@@ -1,118 +1,164 @@
 # Knowledge MCP Server
 
-Centralny serwer RAG (Retrieval-Augmented Generation) dla Claude Code. Przechowuje wiedzę i skille w bazie wektorowej Qdrant z embeddingami z Ollama.
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white)](docker-compose.yml)
+[![Python 3.11+](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)](https://python.org)
 
-## Architektura
+A self-hosted **RAG (Retrieval-Augmented Generation) knowledge base** for AI coding assistants. Store knowledge entries, reusable skills (prompts), project metadata, and private notes in a vector database. Access everything via [MCP (Model Context Protocol)](https://modelcontextprotocol.io/).
+
+Works with **Claude Code**, **OpenCode**, and any MCP-compatible client. Powered by **Qdrant** + **Ollama** embeddings.
+
+## Architecture
 
 ```
-┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│  Mac mini M4    │     │  AMD Workstation│     │  Laptop/inne    │
-│  Claude Code    │     │  Claude Code    │     │  Claude Code    │
-└────────┬────────┘     └────────┬────────┘     └────────┬────────┘
-         │                       │                       │
-         └───────────────────────┼───────────────────────┘
-                                 │ MCP (stdio/SSE)
-                                 ▼
-                    ┌────────────────────────┐
-                    │   ai.ximot.net         │
-                    │   Knowledge MCP        │
-                    │   ─────────────────    │
-                    │   Qdrant + Ollama      │
-                    │   nomic-embed-text     │
-                    └────────────────────────┘
+┌──────────────┐  ┌──────────────┐  ┌──────────────┐
+│ Claude Code  │  │   OpenCode   │  │  MCP Client  │
+└──────┬───────┘  └──────┬───────┘  └──────┬───────┘
+       │                 │                 │
+       └─────────────────┼─────────────────┘
+                         │ MCP (stdio / HTTP+SSE)
+                         ▼
+              ┌─────────────────────┐
+              │  Knowledge MCP      │
+              │  Server (:8765)     │
+              └──┬──────────────┬───┘
+                 │              │
+        ┌────────▼───┐  ┌──────▼──────┐
+        │   Qdrant   │  │   Ollama    │
+        │   (:6333)  │  │  (:11434)   │
+        │ Vector DB  │  │ Embeddings  │
+        └────────────┘  └─────────────┘
 ```
 
-## Funkcje
+**Data flow:** MCP tool call → Pydantic validation → Ollama embeddings → Qdrant vector search/storage
 
-### Knowledge (Baza wiedzy)
-- `knowledge_search` - Semantyczne wyszukiwanie w bazie wiedzy
-- `knowledge_add` - Dodawanie nowych wpisów
-- `knowledge_get` - Pobieranie wpisu po ID
-- `knowledge_update` - Aktualizacja istniejącego wpisu
-- `knowledge_delete` - Usuwanie wpisu
-- `knowledge_list` - Lista wszystkich wpisów z paginacją
+**Collections:** Four Qdrant collections with cosine similarity:
+- `knowledge` — documentation, how-tos, code snippets, references
+- `skills` — reusable prompts and instructions
+- `projects` — project metadata (name, path, description, status)
+- `private` — personal notes, context, preferences
 
-### Skills (Prompty/Instrukcje)
-- `skill_search` - Wyszukiwanie skillów
-- `skill_get` - Pobieranie skilla po nazwie
-- `skill_add` - Dodawanie nowego skilla
-- `skill_update` - Aktualizacja skilla
-- `skill_delete` - Usuwanie skilla
-- `skill_list` - Lista wszystkich skillów
+## Quick Start
 
-## Wymagania
-
-- Python 3.11+
-- Qdrant (localhost:6333 lub remote)
-- Ollama z modelem `nomic-embed-text`
-
-## Instalacja
-
-### 1. Klonowanie i instalacja zależności
+**Prerequisites:** Docker and Docker Compose installed.
 
 ```bash
-cd /opt
-git clone <repo> knowledge-mcp
+# 1. Clone the repository
+git clone https://github.com/ximot/knowledge-mcp.git
 cd knowledge-mcp
-pip install -r requirements.txt
+
+# 2. (Optional) Copy and edit config
+cp .env.example .env
+
+# 3. Start all services
+docker compose up -d
 ```
 
-### 2. Konfiguracja środowiska
+This starts three containers:
+- **knowledge-mcp** — MCP server on port `8765`
+- **qdrant** — vector database on port `6333`
+- **ollama** — embedding model on port `11434` (auto-pulls `nomic-embed-text` on first start)
 
-Utwórz plik `.env` lub ustaw zmienne środowiskowe:
+Verify everything is running:
 
 ```bash
-# Qdrant
-export QDRANT_HOST=localhost
-export QDRANT_PORT=6333
-# export QDRANT_API_KEY=your-key  # jeśli używasz auth
-# export QDRANT_HTTPS=true        # jeśli używasz HTTPS
-
-# Ollama
-export OLLAMA_HOST=http://localhost:11434
-export EMBEDDING_MODEL=nomic-embed-text
-
-# Vector size dla nomic-embed-text to 768
-export VECTOR_SIZE=768
+curl http://localhost:8765/health
+# {"status":"ok","qdrant":true,"ollama":true,"model":"nomic-embed-text"}
 ```
 
-### 3. Uruchomienie Qdrant (jeśli nie masz)
+## Configuration Reference
 
-```bash
-docker run -d --name qdrant \
-  -p 6333:6333 -p 6334:6334 \
-  -v /data/qdrant:/qdrant/storage \
-  --restart unless-stopped \
-  qdrant/qdrant
+All settings are configured via environment variables. Set them in a `.env` file or export directly.
+
+| Variable | Default | Description |
+|---|---|---|
+| `QDRANT_HOST` | `localhost` | Qdrant server hostname |
+| `QDRANT_PORT` | `6333` | Qdrant REST API port |
+| `QDRANT_API_KEY` | _(empty)_ | API key for Qdrant Cloud or secured instances |
+| `QDRANT_HTTPS` | `false` | Use HTTPS for Qdrant connection |
+| `OLLAMA_HOST` | `http://localhost:11434` | Full Ollama server URL |
+| `EMBEDDING_MODEL` | `nomic-embed-text` | Ollama embedding model name |
+| `VECTOR_SIZE` | `768` | Embedding vector dimensions (must match model) |
+| `MCP_HOST` | `0.0.0.0` | HTTP server bind address |
+| `MCP_PORT` | `8765` | HTTP server port |
+
+> When using `docker-compose.yml` (all-in-one), `QDRANT_HOST` and `OLLAMA_HOST` are automatically set to the container service names (`qdrant` and `http://ollama:11434`).
+
+## MCP Tools Reference
+
+The server exposes 24 tools across four collections. All tools support `markdown` (default) and `json` response formats.
+
+### Knowledge
+
+| Tool | Description |
+|---|---|
+| `knowledge_search` | Semantic search across knowledge entries. Filters: `knowledge_type`, `tags` |
+| `knowledge_add` | Add a new entry (title, content, type, tags, source, metadata) |
+| `knowledge_get` | Retrieve a single entry by ID |
+| `knowledge_update` | Update fields of an existing entry (re-embeds on content change) |
+| `knowledge_delete` | Permanently delete an entry by ID |
+| `knowledge_list` | List entries with pagination and optional type/tag filters |
+
+Knowledge types: `note`, `documentation`, `code_snippet`, `reference`, `howto`, `other`
+
+### Skills
+
+| Tool | Description |
+|---|---|
+| `skill_search` | Semantic search across skills |
+| `skill_add` | Add a new skill (name, description, prompt, tags, version, examples) |
+| `skill_get` | Retrieve a skill by exact name (includes full prompt) |
+| `skill_update` | Update skill fields |
+| `skill_delete` | Permanently delete a skill by name |
+| `skill_list` | List all skills (names and descriptions, no prompts) |
+
+Skill names must match: `^[a-z0-9][a-z0-9-]*[a-z0-9]$` (lowercase alphanumeric with hyphens)
+
+### Projects
+
+| Tool | Description |
+|---|---|
+| `project_search` | Semantic search for projects. Filters: `status`, `tags` |
+| `project_add` | Add a project (name, path, description, status, tags, metadata) |
+| `project_get` | Retrieve a project by exact name |
+| `project_update` | Update project fields |
+| `project_delete` | Permanently delete a project by name |
+| `project_list` | List projects with pagination and status/tag filters |
+
+Project statuses: `active`, `archived`, `planned`
+
+### Private
+
+| Tool | Description |
+|---|---|
+| `private_search` | Semantic search across private entries. Filters: `private_type`, `tags` |
+| `private_add` | Add a private entry (title, content, type, tags, metadata) |
+| `private_get` | Retrieve a private entry by ID |
+| `private_update` | Update private entry fields |
+| `private_delete` | Permanently delete a private entry by ID |
+| `private_list` | List private entries with pagination and type/tag filters |
+
+Private types: `note`, `context`, `preference`, `secret_ref`
+
+## Usage with Claude Code
+
+### Option 1: HTTP/SSE (recommended for Docker)
+
+Add to `~/.claude/settings.json` or your project's `.claude/settings.json`:
+
+```json
+{
+  "mcpServers": {
+    "knowledge": {
+      "url": "http://localhost:8765/mcp"
+    }
+  }
+}
 ```
 
-### 4. Sprawdź czy Ollama ma model
+### Option 2: stdio (local Python)
 
-```bash
-ollama pull nomic-embed-text
-```
-
-## Uruchomienie
-
-### Tryb stdio (domyślny dla Claude Code)
-
-```bash
-python -m knowledge_mcp.server
-```
-
-### Tryb HTTP (dla zdalnego dostępu)
-
-Zmodyfikuj `server.py` - zmień ostatnią linię:
-
-```python
-mcp.run(transport="streamable_http", port=8080)
-```
-
-## Konfiguracja Claude Code
-
-Dodaj do `~/.claude/claude_desktop_config.json`:
-
-### Lokalny serwer (stdio)
+Add to `~/.claude/settings.json`:
 
 ```json
 {
@@ -120,7 +166,7 @@ Dodaj do `~/.claude/claude_desktop_config.json`:
     "knowledge": {
       "command": "python",
       "args": ["-m", "knowledge_mcp.server"],
-      "cwd": "/opt/knowledge-mcp",
+      "cwd": "/path/to/knowledge-mcp",
       "env": {
         "QDRANT_HOST": "localhost",
         "OLLAMA_HOST": "http://localhost:11434"
@@ -130,117 +176,178 @@ Dodaj do `~/.claude/claude_desktop_config.json`:
 }
 ```
 
-### Zdalny serwer (przez SSH tunnel)
+## Usage with Other Clients
 
-Na każdej maszynie klienckiej ustaw SSH tunnel:
+### OpenCode
 
-```bash
-# Tunnel do Qdrant i Ollama
-ssh -L 6333:localhost:6333 -L 11434:localhost:11434 user@ai.ximot.net -N
-```
-
-Potem użyj konfiguracji lokalnej powyżej.
-
-### Zdalny serwer (HTTP)
-
-Uruchom serwer HTTP:
-
-```bash
-cd /opt/knowledge-mcp
-source .venv/bin/activate
-MCP_PORT=8765 python knowledge_mcp/http_server.py
-```
-
-Konfiguracja Claude Code (w `~/.claude/settings.json` lub w projekcie `.claude/settings.json`):
+Add to your OpenCode MCP configuration:
 
 ```json
 {
   "mcpServers": {
     "knowledge": {
-      "url": "http://ai.ximot.net:8765/mcp"
+      "url": "http://localhost:8765/mcp"
     }
   }
 }
 ```
 
-**Uwaga:** Serwer obsługuje wielu klientów jednocześnie (stateless mode).
+### Generic MCP Client
 
-## Przykłady użycia
+The server supports two transports:
 
-### Dodawanie wiedzy
+- **stdio** — run `python -m knowledge_mcp.server` as a subprocess
+- **HTTP (Streamable HTTP)** — connect to `http://<host>:8765/mcp`
 
-```
-Dodaj do bazy wiedzy:
-- Tytuł: "Konfiguracja Proxmox HA"
-- Treść: [twoja dokumentacja]
-- Typ: documentation
-- Tagi: proxmox, ha, cluster
-```
+The HTTP mode is stateless (`stateless_http=True`), so multiple clients can connect simultaneously.
 
-### Wyszukiwanie
+## Advanced
 
-```
-Znajdź w bazie wiedzy informacje o konfiguracji HA w Proxmox
-```
+### External Qdrant and Ollama
 
-### Dodawanie skilla
+If you already have Qdrant and Ollama running (on your host, another server, or Qdrant Cloud), use the external compose file:
 
-```
-Dodaj skill "code-reviewer" z promptem:
-"Jesteś doświadczonym code reviewerem. Analizuj kod pod kątem..."
+```bash
+# Set connection details
+export QDRANT_HOST=your-qdrant-host
+export OLLAMA_HOST=http://your-ollama-host:11434
+
+# Start only the MCP server
+docker compose -f docker-compose.external.yml up -d
 ```
 
-### Używanie skilla
+**Qdrant Cloud example:**
 
+```env
+QDRANT_HOST=abc123.us-east4-0.gcp.cloud.qdrant.io
+QDRANT_PORT=6333
+QDRANT_API_KEY=your-api-key-here
+QDRANT_HTTPS=true
+OLLAMA_HOST=http://localhost:11434
 ```
-Pobierz skill "code-reviewer" i użyj go do review mojego kodu
+
+### Custom Embedding Models
+
+You can use any Ollama-compatible embedding model. Change the model and update the vector size accordingly:
+
+```env
+EMBEDDING_MODEL=mxbai-embed-large
+VECTOR_SIZE=1024
 ```
 
-## Struktura kolekcji
+> Make sure to pull the model first: `ollama pull mxbai-embed-large`
+>
+> Changing the embedding model requires re-indexing all existing data since vector dimensions and semantics will differ.
 
-### Knowledge
+### Importing Skills from SKILL.md Files
+
+Bulk import skills from markdown files:
+
+```bash
+# Import all SKILL.md files from a directory (recursive)
+python scripts/import_skills.py /path/to/skills/directory
+
+# Import a single file
+python scripts/import_skills.py /path/to/SKILL.md
+```
+
+SKILL.md format with optional YAML frontmatter:
+
+```markdown
+---
+name: code-reviewer
+description: Expert code reviewer for quality analysis
+tags: [coding, review]
+---
+
+You are an expert code reviewer. Analyze code for:
+1. Logic errors
+2. Security issues
+3. Performance problems
+...
+```
+
+### Health Check
+
+The HTTP server exposes a `/health` endpoint that verifies connectivity to both Qdrant and Ollama:
+
+```bash
+curl http://localhost:8765/health
+```
+
 ```json
 {
-  "id": "k-abc123",
-  "title": "Tytuł wpisu",
-  "content": "Pełna treść...",
-  "knowledge_type": "documentation",
-  "tags": ["tag1", "tag2"],
-  "source": "https://...",
-  "metadata": {},
-  "created_at": "2025-01-01T00:00:00",
-  "updated_at": "2025-01-01T00:00:00"
+  "status": "ok",
+  "qdrant": true,
+  "ollama": true,
+  "model": "nomic-embed-text"
 }
 ```
 
-### Skills
-```json
-{
-  "id": "s-code-reviewer",
-  "name": "code-reviewer",
-  "description": "Code review expert",
-  "prompt": "System prompt...",
-  "tags": ["coding", "review"],
-  "version": "1.0.0",
-  "examples": ["Example 1", "Example 2"],
-  "created_at": "2025-01-01T00:00:00"
-}
+Status is `"ok"` when both backends are reachable, `"degraded"` otherwise (returns HTTP 503).
+
+## Development
+
+### Local Setup
+
+```bash
+# Clone and create virtualenv
+git clone https://github.com/ximot/knowledge-mcp.git
+cd knowledge-mcp
+python -m venv .venv
+source .venv/bin/activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Start Qdrant (if not running)
+docker run -d --name qdrant -p 6333:6333 qdrant/qdrant
+
+# Ensure Ollama has the embedding model
+ollama pull nomic-embed-text
+
+# Run in stdio mode
+python -m knowledge_mcp.server
+
+# Run in HTTP mode
+python knowledge_mcp/http_server.py
 ```
 
-## Troubleshooting
+### Project Structure
 
-### "Connection refused" do Qdrant
-- Sprawdź czy kontener działa: `docker ps | grep qdrant`
-- Sprawdź logi: `docker logs qdrant`
+```
+knowledge-mcp/
+├── knowledge_mcp/
+│   ├── __init__.py
+│   ├── __main__.py        # python -m knowledge_mcp entry point
+│   ├── server.py          # MCP server — all 24 tools
+│   ├── config.py          # Settings from environment variables
+│   ├── qdrant.py          # Qdrant async client wrapper
+│   ├── embeddings.py      # Ollama embedding client
+│   └── http_server.py     # HTTP/SSE transport + /health endpoint
+├── scripts/
+│   ├── import_skills.py   # Bulk SKILL.md importer
+│   └── start.sh           # Shell startup script
+├── docker-compose.yml          # All-in-one (MCP + Qdrant + Ollama)
+├── docker-compose.external.yml # BYO backend (MCP server only)
+├── Dockerfile
+├── .env.example
+├── requirements.txt
+├── LICENSE
+├── CLAUDE.md
+└── README.md
+```
 
-### Błędy embeddingów
-- Sprawdź czy Ollama działa: `curl http://localhost:11434/api/tags`
-- Sprawdź czy model jest pobrany: `ollama list`
+## Contributing
 
-### Serwer MCP nie startuje
-- Sprawdź Python version: `python --version` (wymaga 3.11+)
-- Sprawdź instalację: `pip list | grep mcp`
+Contributions are welcome. Please:
 
-## Licencja
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/my-feature`)
+3. Make your changes
+4. Test with `docker compose up` to verify the full stack works
+5. Submit a pull request
 
-MIT
+## License
+
+[MIT](LICENSE)
