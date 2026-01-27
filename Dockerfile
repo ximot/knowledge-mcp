@@ -5,7 +5,8 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
 WORKDIR /build
 
-COPY pyproject.toml uv.lock ./
+COPY pyproject.toml uv.lock README.md ./
+COPY knowledge_mcp/__init__.py ./knowledge_mcp/__init__.py
 RUN uv sync --frozen --no-dev --no-editable
 
 # ---- Runtime stage ----
