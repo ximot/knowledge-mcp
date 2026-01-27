@@ -2,6 +2,13 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Git Workflow
+
+- **Never commit directly to `main`** — always create a feature/fix branch
+- Branch naming: `feat/<name>`, `fix/<name>`, `docs/<name>`, `refactor/<name>`
+- Create a PR to `main` for review before merging
+- Keep commits atomic and descriptive
+
 ## Project Overview
 
 Knowledge MCP Server — a self-hosted RAG (Retrieval-Augmented Generation) knowledge base for AI coding assistants. Stores knowledge entries, skills (reusable prompts), project context, and private notes in a Qdrant vector database with embeddings from Ollama (nomic-embed-text).
