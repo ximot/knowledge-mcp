@@ -73,7 +73,7 @@
 
         .grid {
             display: grid;
-            grid-template-columns: repeat(5, 1fr);
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
             gap: 20px;
             margin-bottom: 30px;
         }
@@ -188,6 +188,25 @@
             color: #3b82f6;
             float: right;
         }
+
+        .badge {
+            display: inline-block;
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-weight: 500;
+            margin-left: 6px;
+            vertical-align: middle;
+        }
+
+        .badge-active { background: #166534; color: #4ade80; }
+        .badge-archived { background: #1e1e1e; color: #888; }
+        .badge-planned { background: #1e3a5f; color: #60a5fa; }
+
+        .badge-note { background: #2a2a2a; color: #a78bfa; }
+        .badge-context { background: #1e3a5f; color: #60a5fa; }
+        .badge-preference { background: #3b2f1e; color: #fbbf24; }
+        .badge-secret_ref { background: #3b1e1e; color: #f87171; }
 
         /* Modal */
         .modal {
@@ -710,35 +729,75 @@
 
         <!-- List View -->
         <div id="list-view" class="view-content active">
-        <div class="main-grid">
-            <div class="card">
-                <div class="card-header">
-                    <span class="card-title">Knowledge Base</span>
-                    <div>
-                        <button class="btn btn-small btn-primary" onclick="showAddForm('knowledge')">+ Add</button>
-                        <button class="refresh-btn" onclick="loadKnowledge()">Refresh</button>
-                    </div>
-                </div>
-                <input type="text" class="search-box" id="knowledge-search" placeholder="Search knowledge..." oninput="searchKnowledge(this.value)">
-                <div class="list" id="knowledge-list">
-                    <div class="empty-state">Loading...</div>
+
+        <!-- Collection Tabs -->
+        <div class="tabs" id="collection-tabs">
+            <button class="tab active" onclick="switchCollection('knowledge')">Knowledge</button>
+            <button class="tab" onclick="switchCollection('skills')">Skills</button>
+            <button class="tab" onclick="switchCollection('projects')">Projects</button>
+            <button class="tab" onclick="switchCollection('private')">Private</button>
+        </div>
+
+        <!-- Knowledge Panel -->
+        <div class="card collection-panel" id="panel-knowledge">
+            <div class="card-header">
+                <span class="card-title">Knowledge Base</span>
+                <div>
+                    <button class="btn btn-small btn-primary" onclick="showAddForm('knowledge')">+ Add</button>
+                    <button class="refresh-btn" onclick="loadKnowledge()">Refresh</button>
                 </div>
             </div>
-
-            <div class="card">
-                <div class="card-header">
-                    <span class="card-title">Skills</span>
-                    <div>
-                        <button class="btn btn-small btn-primary" onclick="showAddForm('skill')">+ Add</button>
-                        <button class="refresh-btn" onclick="loadSkills()">Refresh</button>
-                    </div>
-                </div>
-                <input type="text" class="search-box" id="skills-search" placeholder="Search skills..." oninput="searchSkills(this.value)">
-                <div class="list" id="skills-list">
-                    <div class="empty-state">Loading...</div>
-                </div>
+            <input type="text" class="search-box" id="knowledge-search" placeholder="Search knowledge..." oninput="searchKnowledge(this.value)">
+            <div class="list" id="knowledge-list">
+                <div class="empty-state">Loading...</div>
             </div>
         </div>
+
+        <!-- Skills Panel -->
+        <div class="card collection-panel" id="panel-skills" style="display:none">
+            <div class="card-header">
+                <span class="card-title">Skills</span>
+                <div>
+                    <button class="btn btn-small btn-primary" onclick="showAddForm('skill')">+ Add</button>
+                    <button class="refresh-btn" onclick="loadSkills()">Refresh</button>
+                </div>
+            </div>
+            <input type="text" class="search-box" id="skills-search" placeholder="Search skills..." oninput="searchSkills(this.value)">
+            <div class="list" id="skills-list">
+                <div class="empty-state">Loading...</div>
+            </div>
+        </div>
+
+        <!-- Projects Panel -->
+        <div class="card collection-panel" id="panel-projects" style="display:none">
+            <div class="card-header">
+                <span class="card-title">Projects</span>
+                <div>
+                    <button class="btn btn-small btn-primary" onclick="showAddForm('project')">+ Add</button>
+                    <button class="refresh-btn" onclick="loadProjects()">Refresh</button>
+                </div>
+            </div>
+            <input type="text" class="search-box" id="projects-search" placeholder="Search projects..." oninput="searchProjects(this.value)">
+            <div class="list" id="projects-list">
+                <div class="empty-state">Loading...</div>
+            </div>
+        </div>
+
+        <!-- Private Panel -->
+        <div class="card collection-panel" id="panel-private" style="display:none">
+            <div class="card-header">
+                <span class="card-title">Private Notes</span>
+                <div>
+                    <button class="btn btn-small btn-primary" onclick="showAddForm('private')">+ Add</button>
+                    <button class="refresh-btn" onclick="loadPrivate()">Refresh</button>
+                </div>
+            </div>
+            <input type="text" class="search-box" id="private-search" placeholder="Search private notes..." oninput="searchPrivate(this.value)">
+            <div class="list" id="private-list">
+                <div class="empty-state">Loading...</div>
+            </div>
+        </div>
+
         </div><!-- /list-view -->
 
         <!-- Graph View -->
@@ -845,6 +904,77 @@
         </div>
     </div>
 
+    <!-- Add Project Modal -->
+    <div class="modal" id="add-project-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Add Project</h2>
+                <button class="modal-close" onclick="closeAddModal('project')">&times;</button>
+            </div>
+            <form onsubmit="submitProject(event)">
+                <div class="form-group">
+                    <label class="form-label">Name * (lowercase, a-z0-9-)</label>
+                    <input type="text" class="form-input" id="p-name" required pattern="[a-z0-9-]+">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Description</label>
+                    <input type="text" class="form-input" id="p-description">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Path</label>
+                    <input type="text" class="form-input" id="p-path" placeholder="/path/to/project">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Status</label>
+                    <select class="form-select" id="p-status">
+                        <option value="active">Active</option>
+                        <option value="planned">Planned</option>
+                        <option value="archived">Archived</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Tags (comma separated)</label>
+                    <input type="text" class="form-input" id="p-tags" placeholder="tag1, tag2">
+                </div>
+                <button type="submit" class="btn btn-primary">Add Project</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add Private Modal -->
+    <div class="modal" id="add-private-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Add Private Note</h2>
+                <button class="modal-close" onclick="closeAddModal('private')">&times;</button>
+            </div>
+            <form onsubmit="submitPrivate(event)">
+                <div class="form-group">
+                    <label class="form-label">Title *</label>
+                    <input type="text" class="form-input" id="pr-title" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Content * (Markdown)</label>
+                    <textarea class="form-textarea" id="pr-content" required></textarea>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Type</label>
+                    <select class="form-select" id="pr-type">
+                        <option value="note">Note</option>
+                        <option value="context">Context</option>
+                        <option value="preference">Preference</option>
+                        <option value="secret_ref">Secret Reference</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Tags (comma separated)</label>
+                    <input type="text" class="form-input" id="pr-tags" placeholder="tag1, tag2">
+                </div>
+                <button type="submit" class="btn btn-primary">Add Private Note</button>
+            </form>
+        </div>
+    </div>
+
     <div class="notification" id="notification"></div>
 
     <script>
@@ -852,8 +982,8 @@
         const API_BASE = '';
 
         let searchCount = 0;
-        let addCount = 0;
         let searchTimeout = null;
+        let activeCollection = 'knowledge';
 
         // Check services status via /health endpoint
         async function checkStatus() {
@@ -880,6 +1010,20 @@
             dot.classList.add(online ? 'online' : 'offline');
         }
 
+        // Collection tab switching
+        function switchCollection(name) {
+            activeCollection = name;
+            // Update tab buttons
+            document.querySelectorAll('#collection-tabs .tab').forEach(tab => tab.classList.remove('active'));
+            const tabs = document.querySelectorAll('#collection-tabs .tab');
+            const tabMap = { knowledge: 0, skills: 1, projects: 2, private: 3 };
+            tabs[tabMap[name]].classList.add('active');
+
+            // Show/hide panels
+            document.querySelectorAll('.collection-panel').forEach(p => p.style.display = 'none');
+            document.getElementById(`panel-${name}`).style.display = 'block';
+        }
+
         // Load data
         async function loadKnowledge() {
             try {
@@ -903,6 +1047,28 @@
             }
         }
 
+        async function loadProjects() {
+            try {
+                const res = await fetch(`${API_BASE}/api/projects?limit=50`);
+                const data = await res.json();
+                document.getElementById('stat-projects').textContent = data.count;
+                renderList('projects-list', data.results, 'project');
+            } catch (e) {
+                document.getElementById('projects-list').innerHTML = '<div class="empty-state">Error loading data</div>';
+            }
+        }
+
+        async function loadPrivate() {
+            try {
+                const res = await fetch(`${API_BASE}/api/private?limit=50`);
+                const data = await res.json();
+                document.getElementById('stat-private').textContent = data.count;
+                renderList('private-list', data.results, 'private');
+            } catch (e) {
+                document.getElementById('private-list').innerHTML = '<div class="empty-state">Error loading data</div>';
+            }
+        }
+
         // Store items for click handling
         let itemsCache = {};
 
@@ -914,10 +1080,26 @@
             }
 
             container.innerHTML = items.map((item, index) => {
-                const title = type === 'knowledge' ? item.title : item.name;
-                const meta = type === 'knowledge'
-                    ? `${item.knowledge_type} • ${new Date(item.created_at).toLocaleDateString()}`
-                    : `v${item.version}`;
+                let title, meta, badge = '';
+
+                if (type === 'knowledge') {
+                    title = item.title;
+                    meta = `${item.knowledge_type} • ${new Date(item.created_at).toLocaleDateString()}`;
+                } else if (type === 'skill') {
+                    title = item.name;
+                    meta = `v${item.version}`;
+                } else if (type === 'project') {
+                    title = item.name;
+                    const status = item.status || 'active';
+                    badge = `<span class="badge badge-${escapeHtml(status)}">${escapeHtml(status)}</span>`;
+                    meta = item.path || item.description || '';
+                } else if (type === 'private') {
+                    title = item.title;
+                    const ptype = item.private_type || 'note';
+                    badge = `<span class="badge badge-${escapeHtml(ptype)}">${escapeHtml(ptype)}</span>`;
+                    meta = new Date(item.created_at).toLocaleDateString();
+                }
+
                 const score = item.score ? `<span class="score">${(item.score * 100).toFixed(0)}%</span>` : '';
                 const tags = (item.tags || []).slice(0, 4).map(t => `<span class="tag">${escapeHtml(t)}</span>`).join('');
 
@@ -927,8 +1109,8 @@
 
                 return `
                     <div class="list-item" onclick="showDetail(itemsCache['${cacheKey}'], '${type}')">
-                        <div class="list-item-title">${escapeHtml(title)} ${score}</div>
-                        <div class="list-item-meta">${meta}</div>
+                        <div class="list-item-title">${escapeHtml(title)} ${badge} ${score}</div>
+                        <div class="list-item-meta">${escapeHtml(meta)}</div>
                         <div class="tags">${tags}</div>
                     </div>
                 `;
@@ -943,45 +1125,26 @@
         }
 
         // Search
-        async function searchKnowledge(query) {
-            clearTimeout(searchTimeout);
-            searchTimeout = setTimeout(async () => {
-                if (!query) {
-                    loadKnowledge();
-                    return;
-                }
-                searchCount++;
-                document.getElementById('stat-searches').textContent = searchCount;
-
-                try {
-                    const res = await fetch(`${API_BASE}/api/knowledge?q=${encodeURIComponent(query)}&limit=20`);
-                    const data = await res.json();
-                    renderList('knowledge-list', data.results, 'knowledge');
-                } catch (e) {
-                    console.error(e);
-                }
-            }, 300);
+        function makeSearch(apiPath, listId, type, loadFn) {
+            return function(query) {
+                clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(async () => {
+                    if (!query) { loadFn(); return; }
+                    searchCount++;
+                    document.getElementById('stat-searches').textContent = searchCount;
+                    try {
+                        const res = await fetch(`${API_BASE}${apiPath}?q=${encodeURIComponent(query)}&limit=20`);
+                        const data = await res.json();
+                        renderList(listId, data.results, type);
+                    } catch (e) { console.error(e); }
+                }, 300);
+            };
         }
 
-        async function searchSkills(query) {
-            clearTimeout(searchTimeout);
-            searchTimeout = setTimeout(async () => {
-                if (!query) {
-                    loadSkills();
-                    return;
-                }
-                searchCount++;
-                document.getElementById('stat-searches').textContent = searchCount;
-
-                try {
-                    const res = await fetch(`${API_BASE}/api/skills?q=${encodeURIComponent(query)}&limit=20`);
-                    const data = await res.json();
-                    renderList('skills-list', data.results, 'skill');
-                } catch (e) {
-                    console.error(e);
-                }
-            }, 300);
-        }
+        const searchKnowledge = makeSearch('/api/knowledge', 'knowledge-list', 'knowledge', loadKnowledge);
+        const searchSkills = makeSearch('/api/skills', 'skills-list', 'skill', loadSkills);
+        const searchProjects = makeSearch('/api/projects', 'projects-list', 'project', loadProjects);
+        const searchPrivate = makeSearch('/api/private', 'private-list', 'private', loadPrivate);
 
         // Unified search across all collections
         let unifiedTimeout = null;
@@ -1056,11 +1219,10 @@
         // Detail modal
         function showDetail(item, type) {
             const modal = document.getElementById('detail-modal');
-            let title = item.title || item.name || item.id;
-            document.getElementById('modal-title').textContent = title;
+            let title, body = '';
 
-            let body = '';
             if (type === 'knowledge') {
+                title = item.title;
                 body = `
                     <p><strong>ID:</strong> <code>${item.id}</code></p>
                     <p><strong>Type:</strong> ${item.knowledge_type}</p>
@@ -1071,6 +1233,7 @@
                     <div>${markdownToHtml(item.content)}</div>
                 `;
             } else if (type === 'skill') {
+                title = item.name;
                 body = `
                     <p><strong>ID:</strong> <code>${item.id}</code></p>
                     <p><strong>Version:</strong> ${item.version}</p>
@@ -1081,24 +1244,31 @@
                     <pre>${item.prompt || 'N/A (use skill_get to fetch full prompt)'}</pre>
                 `;
             } else if (type === 'project') {
+                title = item.name;
+                const status = item.status || 'active';
                 body = `
                     <p><strong>ID:</strong> <code>${item.id}</code></p>
-                    <p><strong>Status:</strong> ${item.status || 'unknown'}</p>
+                    <p><strong>Status:</strong> <span class="badge badge-${escapeHtml(status)}">${escapeHtml(status)}</span></p>
                     <p><strong>Path:</strong> ${item.path || 'none'}</p>
                     <p><strong>Tags:</strong> ${(item.tags || []).join(', ') || 'none'}</p>
+                    <p><strong>Created:</strong> ${new Date(item.created_at).toLocaleString()}</p>
                     <hr style="border-color: #2a2a2a; margin: 15px 0;">
-                    <div>${markdownToHtml(item.description || '')}</div>
+                    <div>${markdownToHtml(item.description)}</div>
                 `;
             } else if (type === 'private') {
+                title = item.title;
+                const ptype = item.private_type || 'note';
                 body = `
                     <p><strong>ID:</strong> <code>${item.id}</code></p>
-                    <p><strong>Type:</strong> ${item.private_type || 'note'}</p>
+                    <p><strong>Type:</strong> <span class="badge badge-${escapeHtml(ptype)}">${escapeHtml(ptype)}</span></p>
                     <p><strong>Tags:</strong> ${(item.tags || []).join(', ') || 'none'}</p>
+                    <p><strong>Created:</strong> ${new Date(item.created_at).toLocaleString()}</p>
                     <hr style="border-color: #2a2a2a; margin: 15px 0;">
-                    <div>${markdownToHtml(item.content || '')}</div>
+                    <div>${markdownToHtml(item.content)}</div>
                 `;
             }
 
+            document.getElementById('modal-title').textContent = title;
             document.getElementById('modal-body').innerHTML = body;
             modal.classList.add('active');
         }
@@ -1135,9 +1305,8 @@
                 const result = await res.json();
 
                 if (result.success) {
-                    addCount++;
-                    // stat-adds removed - counts tracked via stats API
                     showNotification('Knowledge added successfully!');
+                    loadStats();
                     closeAddModal('knowledge');
                     loadKnowledge();
                     e.target.reset();
@@ -1168,9 +1337,8 @@
                 const result = await res.json();
 
                 if (result.success) {
-                    addCount++;
-                    // stat-adds removed - counts tracked via stats API
                     showNotification('Skill added successfully!');
+                    loadStats();
                     closeAddModal('skill');
                     loadSkills();
                     e.target.reset();
@@ -1180,6 +1348,69 @@
                 }
             } catch (err) {
                 showNotification('Error adding skill', true);
+            }
+        }
+
+        async function submitProject(e) {
+            e.preventDefault();
+            const data = {
+                name: document.getElementById('p-name').value,
+                description: document.getElementById('p-description').value,
+                path: document.getElementById('p-path').value || '',
+                status: document.getElementById('p-status').value,
+                tags: document.getElementById('p-tags').value.split(',').map(t => t.trim()).filter(t => t)
+            };
+
+            try {
+                const res = await fetch(`${API_BASE}/api/projects`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                const result = await res.json();
+
+                if (result.success) {
+                    showNotification('Project added successfully!');
+                    loadStats();
+                    closeAddModal('project');
+                    loadProjects();
+                    e.target.reset();
+                } else {
+                    showNotification(result.error, true);
+                }
+            } catch (err) {
+                showNotification('Error adding project', true);
+            }
+        }
+
+        async function submitPrivate(e) {
+            e.preventDefault();
+            const data = {
+                title: document.getElementById('pr-title').value,
+                content: document.getElementById('pr-content').value,
+                private_type: document.getElementById('pr-type').value,
+                tags: document.getElementById('pr-tags').value.split(',').map(t => t.trim()).filter(t => t)
+            };
+
+            try {
+                const res = await fetch(`${API_BASE}/api/private`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                const result = await res.json();
+
+                if (result.success) {
+                    showNotification('Private note added successfully!');
+                    loadStats();
+                    closeAddModal('private');
+                    loadPrivate();
+                    e.target.reset();
+                } else {
+                    showNotification(result.error, true);
+                }
+            } catch (err) {
+                showNotification('Error adding private note', true);
             }
         }
 
@@ -1227,6 +1458,8 @@
         checkStatus();
         loadKnowledge();
         loadSkills();
+        loadProjects();
+        loadPrivate();
 
         // Auto-refresh
         setInterval(checkStatus, 30000);      // Status every 30s
@@ -1239,8 +1472,8 @@
                 const data = await res.json();
                 document.getElementById('stat-knowledge').textContent = data.knowledge_count;
                 document.getElementById('stat-skills').textContent = data.skills_count;
-                document.getElementById('stat-projects').textContent = data.projects_count || 0;
-                document.getElementById('stat-private').textContent = data.private_count || 0;
+                document.getElementById('stat-projects').textContent = data.projects_count;
+                document.getElementById('stat-private').textContent = data.private_count;
             } catch (e) {
                 console.error('Stats refresh error:', e);
             }
