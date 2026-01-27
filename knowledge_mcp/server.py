@@ -7,16 +7,15 @@ stored in Qdrant with embeddings from Ollama.
 """
 
 import json
-import uuid
 import hashlib
 from datetime import datetime
-from typing import Optional, List, Dict, Any
+from typing import Any, Dict, List, Optional, Union
 from enum import Enum
 
 from pydantic import BaseModel, Field, ConfigDict
 from mcp.server.fastmcp import FastMCP
+from mcp.types import ToolAnnotations
 
-from .config import settings
 from .embeddings import get_embeddings
 from .qdrant import QdrantService
 
@@ -810,13 +809,7 @@ def format_private_md(entry: Dict[str, Any], include_content: bool = True) -> st
 
 @mcp.tool(
     name="knowledge_search",
-    annotations={
-        "title": "Search Knowledge Base",
-        "readOnlyHint": True,
-        "destructiveHint": False,
-        "idempotentHint": True,
-        "openWorldHint": False
-    }
+    annotations=ToolAnnotations(title="Search Knowledge Base", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
 )
 async def knowledge_search(params: KnowledgeSearchInput) -> str:
     """
@@ -836,7 +829,7 @@ async def knowledge_search(params: KnowledgeSearchInput) -> str:
         query_embedding = await get_embeddings(params.query)
         
         # Build filters
-        filters = {}
+        filters: Dict[str, Union[str, List[str]]] = {}
         if params.knowledge_type:
             filters['knowledge_type'] = params.knowledge_type.value
         if params.tags:
@@ -870,13 +863,7 @@ async def knowledge_search(params: KnowledgeSearchInput) -> str:
 
 @mcp.tool(
     name="knowledge_add",
-    annotations={
-        "title": "Add Knowledge Entry",
-        "readOnlyHint": False,
-        "destructiveHint": False,
-        "idempotentHint": False,
-        "openWorldHint": False
-    }
+    annotations=ToolAnnotations(title="Add Knowledge Entry", readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=False)
 )
 async def knowledge_add(params: KnowledgeAddInput) -> str:
     """
@@ -931,13 +918,7 @@ async def knowledge_add(params: KnowledgeAddInput) -> str:
 
 @mcp.tool(
     name="knowledge_get",
-    annotations={
-        "title": "Get Knowledge Entry",
-        "readOnlyHint": True,
-        "destructiveHint": False,
-        "idempotentHint": True,
-        "openWorldHint": False
-    }
+    annotations=ToolAnnotations(title="Get Knowledge Entry", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
 )
 async def knowledge_get(params: KnowledgeGetInput) -> str:
     """
@@ -966,13 +947,7 @@ async def knowledge_get(params: KnowledgeGetInput) -> str:
 
 @mcp.tool(
     name="knowledge_update",
-    annotations={
-        "title": "Update Knowledge Entry",
-        "readOnlyHint": False,
-        "destructiveHint": False,
-        "idempotentHint": True,
-        "openWorldHint": False
-    }
+    annotations=ToolAnnotations(title="Update Knowledge Entry", readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False)
 )
 async def knowledge_update(params: KnowledgeUpdateInput) -> str:
     """
@@ -1033,13 +1008,7 @@ async def knowledge_update(params: KnowledgeUpdateInput) -> str:
 
 @mcp.tool(
     name="knowledge_delete",
-    annotations={
-        "title": "Delete Knowledge Entry",
-        "readOnlyHint": False,
-        "destructiveHint": True,
-        "idempotentHint": True,
-        "openWorldHint": False
-    }
+    annotations=ToolAnnotations(title="Delete Knowledge Entry", readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False)
 )
 async def knowledge_delete(params: KnowledgeDeleteInput) -> str:
     """
@@ -1069,13 +1038,7 @@ async def knowledge_delete(params: KnowledgeDeleteInput) -> str:
 
 @mcp.tool(
     name="knowledge_list",
-    annotations={
-        "title": "List Knowledge Entries",
-        "readOnlyHint": True,
-        "destructiveHint": False,
-        "idempotentHint": True,
-        "openWorldHint": False
-    }
+    annotations=ToolAnnotations(title="List Knowledge Entries", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
 )
 async def knowledge_list(params: KnowledgeListInput) -> str:
     """
@@ -1090,7 +1053,7 @@ async def knowledge_list(params: KnowledgeListInput) -> str:
         List of knowledge entries (titles and metadata, not full content)
     """
     try:
-        filters = {}
+        filters: Dict[str, Union[str, List[str]]] = {}
         if params.knowledge_type:
             filters['knowledge_type'] = params.knowledge_type.value
         if params.tags:
@@ -1116,7 +1079,7 @@ async def knowledge_list(params: KnowledgeListInput) -> str:
         
         # Markdown format (without full content)
         output = [
-            f"# Knowledge Base",
+            "# Knowledge Base",
             f"Showing {len(results)} of {total} entries (offset: {params.offset})",
             ""
         ]
@@ -1144,13 +1107,7 @@ async def knowledge_list(params: KnowledgeListInput) -> str:
 
 @mcp.tool(
     name="skill_search",
-    annotations={
-        "title": "Search Skills",
-        "readOnlyHint": True,
-        "destructiveHint": False,
-        "idempotentHint": True,
-        "openWorldHint": False
-    }
+    annotations=ToolAnnotations(title="Search Skills", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
 )
 async def skill_search(params: SkillSearchInput) -> str:
     """
@@ -1193,13 +1150,7 @@ async def skill_search(params: SkillSearchInput) -> str:
 
 @mcp.tool(
     name="skill_get",
-    annotations={
-        "title": "Get Skill by Name",
-        "readOnlyHint": True,
-        "destructiveHint": False,
-        "idempotentHint": True,
-        "openWorldHint": False
-    }
+    annotations=ToolAnnotations(title="Get Skill by Name", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
 )
 async def skill_get(params: SkillGetInput) -> str:
     """
@@ -1231,13 +1182,7 @@ async def skill_get(params: SkillGetInput) -> str:
 
 @mcp.tool(
     name="skill_add",
-    annotations={
-        "title": "Add New Skill",
-        "readOnlyHint": False,
-        "destructiveHint": False,
-        "idempotentHint": False,
-        "openWorldHint": False
-    }
+    annotations=ToolAnnotations(title="Add New Skill", readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=False)
 )
 async def skill_add(params: SkillAddInput) -> str:
     """
@@ -1297,13 +1242,7 @@ async def skill_add(params: SkillAddInput) -> str:
 
 @mcp.tool(
     name="skill_update",
-    annotations={
-        "title": "Update Skill",
-        "readOnlyHint": False,
-        "destructiveHint": False,
-        "idempotentHint": True,
-        "openWorldHint": False
-    }
+    annotations=ToolAnnotations(title="Update Skill", readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False)
 )
 async def skill_update(params: SkillUpdateInput) -> str:
     """
@@ -1360,13 +1299,7 @@ async def skill_update(params: SkillUpdateInput) -> str:
 
 @mcp.tool(
     name="skill_delete",
-    annotations={
-        "title": "Delete Skill",
-        "readOnlyHint": False,
-        "destructiveHint": True,
-        "idempotentHint": True,
-        "openWorldHint": False
-    }
+    annotations=ToolAnnotations(title="Delete Skill", readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False)
 )
 async def skill_delete(params: SkillDeleteInput) -> str:
     """
@@ -1399,13 +1332,7 @@ async def skill_delete(params: SkillDeleteInput) -> str:
 
 @mcp.tool(
     name="skill_list",
-    annotations={
-        "title": "List All Skills",
-        "readOnlyHint": True,
-        "destructiveHint": False,
-        "idempotentHint": True,
-        "openWorldHint": False
-    }
+    annotations=ToolAnnotations(title="List All Skills", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
 )
 async def skill_list(params: SkillListInput) -> str:
     """
@@ -1420,7 +1347,7 @@ async def skill_list(params: SkillListInput) -> str:
         List of skills
     """
     try:
-        filters = {}
+        filters: Dict[str, Union[str, List[str]]] = {}
         if params.tags:
             filters['tags'] = params.tags
         
@@ -1463,13 +1390,7 @@ async def skill_list(params: SkillListInput) -> str:
 
 @mcp.tool(
     name="project_search",
-    annotations={
-        "title": "Search Projects",
-        "readOnlyHint": True,
-        "destructiveHint": False,
-        "idempotentHint": True,
-        "openWorldHint": False
-    }
+    annotations=ToolAnnotations(title="Search Projects", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
 )
 async def project_search(params: ProjectSearchInput) -> str:
     """
@@ -1486,7 +1407,7 @@ async def project_search(params: ProjectSearchInput) -> str:
     try:
         query_embedding = await get_embeddings(params.query)
 
-        filters = {}
+        filters: Dict[str, Union[str, List[str]]] = {}
         if params.status:
             filters['status'] = params.status.value
         if params.tags:
@@ -1518,13 +1439,7 @@ async def project_search(params: ProjectSearchInput) -> str:
 
 @mcp.tool(
     name="project_add",
-    annotations={
-        "title": "Add Project",
-        "readOnlyHint": False,
-        "destructiveHint": False,
-        "idempotentHint": False,
-        "openWorldHint": False
-    }
+    annotations=ToolAnnotations(title="Add Project", readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=False)
 )
 async def project_add(params: ProjectAddInput) -> str:
     """
@@ -1580,13 +1495,7 @@ async def project_add(params: ProjectAddInput) -> str:
 
 @mcp.tool(
     name="project_get",
-    annotations={
-        "title": "Get Project by Name",
-        "readOnlyHint": True,
-        "destructiveHint": False,
-        "idempotentHint": True,
-        "openWorldHint": False
-    }
+    annotations=ToolAnnotations(title="Get Project by Name", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
 )
 async def project_get(params: ProjectGetInput) -> str:
     """
@@ -1619,13 +1528,7 @@ async def project_get(params: ProjectGetInput) -> str:
 
 @mcp.tool(
     name="project_update",
-    annotations={
-        "title": "Update Project",
-        "readOnlyHint": False,
-        "destructiveHint": False,
-        "idempotentHint": True,
-        "openWorldHint": False
-    }
+    annotations=ToolAnnotations(title="Update Project", readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False)
 )
 async def project_update(params: ProjectUpdateInput) -> str:
     """
@@ -1685,13 +1588,7 @@ async def project_update(params: ProjectUpdateInput) -> str:
 
 @mcp.tool(
     name="project_delete",
-    annotations={
-        "title": "Delete Project",
-        "readOnlyHint": False,
-        "destructiveHint": True,
-        "idempotentHint": True,
-        "openWorldHint": False
-    }
+    annotations=ToolAnnotations(title="Delete Project", readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False)
 )
 async def project_delete(params: ProjectDeleteInput) -> str:
     """
@@ -1724,13 +1621,7 @@ async def project_delete(params: ProjectDeleteInput) -> str:
 
 @mcp.tool(
     name="project_list",
-    annotations={
-        "title": "List Projects",
-        "readOnlyHint": True,
-        "destructiveHint": False,
-        "idempotentHint": True,
-        "openWorldHint": False
-    }
+    annotations=ToolAnnotations(title="List Projects", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
 )
 async def project_list(params: ProjectListInput) -> str:
     """
@@ -1743,7 +1634,7 @@ async def project_list(params: ProjectListInput) -> str:
         List of projects
     """
     try:
-        filters = {}
+        filters: Dict[str, Union[str, List[str]]] = {}
         if params.status:
             filters['status'] = params.status.value
         if params.tags:
@@ -1768,7 +1659,7 @@ async def project_list(params: ProjectListInput) -> str:
             }, indent=2, default=str)
 
         output = [
-            f"# Projects",
+            "# Projects",
             f"Showing {len(results)} of {total} projects (offset: {params.offset})",
             ""
         ]
@@ -1798,13 +1689,7 @@ async def project_list(params: ProjectListInput) -> str:
 
 @mcp.tool(
     name="private_search",
-    annotations={
-        "title": "Search Private Data",
-        "readOnlyHint": True,
-        "destructiveHint": False,
-        "idempotentHint": True,
-        "openWorldHint": False
-    }
+    annotations=ToolAnnotations(title="Search Private Data", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
 )
 async def private_search(params: PrivateSearchInput) -> str:
     """
@@ -1821,7 +1706,7 @@ async def private_search(params: PrivateSearchInput) -> str:
     try:
         query_embedding = await get_embeddings(params.query)
 
-        filters = {}
+        filters: Dict[str, Union[str, List[str]]] = {}
         if params.private_type:
             filters['private_type'] = params.private_type.value
         if params.tags:
@@ -1853,13 +1738,7 @@ async def private_search(params: PrivateSearchInput) -> str:
 
 @mcp.tool(
     name="private_add",
-    annotations={
-        "title": "Add Private Entry",
-        "readOnlyHint": False,
-        "destructiveHint": False,
-        "idempotentHint": False,
-        "openWorldHint": False
-    }
+    annotations=ToolAnnotations(title="Add Private Entry", readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=False)
 )
 async def private_add(params: PrivateAddInput) -> str:
     """
@@ -1908,13 +1787,7 @@ async def private_add(params: PrivateAddInput) -> str:
 
 @mcp.tool(
     name="private_get",
-    annotations={
-        "title": "Get Private Entry",
-        "readOnlyHint": True,
-        "destructiveHint": False,
-        "idempotentHint": True,
-        "openWorldHint": False
-    }
+    annotations=ToolAnnotations(title="Get Private Entry", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
 )
 async def private_get(params: PrivateGetInput) -> str:
     """
@@ -1943,13 +1816,7 @@ async def private_get(params: PrivateGetInput) -> str:
 
 @mcp.tool(
     name="private_update",
-    annotations={
-        "title": "Update Private Entry",
-        "readOnlyHint": False,
-        "destructiveHint": False,
-        "idempotentHint": True,
-        "openWorldHint": False
-    }
+    annotations=ToolAnnotations(title="Update Private Entry", readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False)
 )
 async def private_update(params: PrivateUpdateInput) -> str:
     """
@@ -2005,13 +1872,7 @@ async def private_update(params: PrivateUpdateInput) -> str:
 
 @mcp.tool(
     name="private_delete",
-    annotations={
-        "title": "Delete Private Entry",
-        "readOnlyHint": False,
-        "destructiveHint": True,
-        "idempotentHint": True,
-        "openWorldHint": False
-    }
+    annotations=ToolAnnotations(title="Delete Private Entry", readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False)
 )
 async def private_delete(params: PrivateDeleteInput) -> str:
     """
@@ -2040,13 +1901,7 @@ async def private_delete(params: PrivateDeleteInput) -> str:
 
 @mcp.tool(
     name="private_list",
-    annotations={
-        "title": "List Private Entries",
-        "readOnlyHint": True,
-        "destructiveHint": False,
-        "idempotentHint": True,
-        "openWorldHint": False
-    }
+    annotations=ToolAnnotations(title="List Private Entries", readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
 )
 async def private_list(params: PrivateListInput) -> str:
     """
@@ -2059,7 +1914,7 @@ async def private_list(params: PrivateListInput) -> str:
         List of private entries (titles and metadata, not full content)
     """
     try:
-        filters = {}
+        filters: Dict[str, Union[str, List[str]]] = {}
         if params.private_type:
             filters['private_type'] = params.private_type.value
         if params.tags:
@@ -2084,7 +1939,7 @@ async def private_list(params: PrivateListInput) -> str:
             }, indent=2, default=str)
 
         output = [
-            f"# Private Data",
+            "# Private Data",
             f"Showing {len(results)} of {total} entries (offset: {params.offset})",
             ""
         ]

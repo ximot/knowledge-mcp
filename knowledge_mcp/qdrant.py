@@ -5,8 +5,8 @@ Handles all interactions with Qdrant vector database.
 """
 
 import uuid
-from typing import List, Dict, Any, Optional, Tuple
-from qdrant_client import QdrantClient, AsyncQdrantClient
+from typing import List, Dict, Any, Optional, Tuple, cast
+from qdrant_client import AsyncQdrantClient
 from qdrant_client.http import models
 from qdrant_client.http.models import (
     Distance,
@@ -145,7 +145,7 @@ class QdrantService:
         if not conditions:
             return None
         
-        return Filter(must=conditions)
+        return Filter(must=cast(Any, conditions))
     
     async def search(
         self,
@@ -180,7 +180,7 @@ class QdrantService:
         )
 
         return [
-            {**point.payload, "score": point.score}
+            {**(point.payload or {}), "score": point.score}
             for point in results.points
         ]
     
@@ -342,4 +342,4 @@ class QdrantService:
             with_payload=True
         )
         
-        return [point.payload for point in results], total
+        return [(point.payload or {}) for point in results], total
