@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-Knowledge MCP Server - Centralny RAG dla Claude Code.
+Knowledge MCP Server - RAG server for Claude Code.
 
-Serwer MCP zapewniający dostęp do bazy wiedzy i skillów
-przechowywanych w Qdrant z embeddingami z Ollama.
+MCP server providing access to knowledge and skills
+stored in Qdrant with embeddings from Ollama.
 """
 
 import json

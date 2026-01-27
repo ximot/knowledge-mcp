@@ -11,8 +11,8 @@ Works with Claude Code, OpenCode, and any MCP-compatible client. Powered by Qdra
 ## Phase 1: Code Cleanup (Priority: HIGH)
 
 ### 1.1 Remove local/private configuration
-- [ ] `knowledge_mcp/config.py` — Remove any hardcoded IPs (e.g., `192.168.1.9`), make everything env-driven
-- [ ] `knowledge-rest-wrapper.py` — Remove from main branch (n8n integration = later)
+- [x] `knowledge_mcp/config.py` — Remove any hardcoded IPs (e.g., `192.168.1.9`), make everything env-driven
+- [x] `knowledge_mcp/rest_api.py` — Removed (n8n integration = later)
 - [ ] `knowledge-rest-api.service` — Remove (related to wrapper)
 - [ ] `start-rest-api.sh` — Remove (related to wrapper)
 - [ ] `wrapper.log` — Remove (should be gitignored)
@@ -22,19 +22,19 @@ Works with Claude Code, OpenCode, and any MCP-compatible client. Powered by Qdra
 - [ ] `.venv/` — Remove from repo, add to `.gitignore`
 
 ### 1.2 Translate Polish → English
-- [ ] `knowledge_mcp/server.py` — Translate all Polish comments/docstrings
-- [ ] `knowledge_mcp/config.py` — Translate comments
-- [ ] `knowledge_mcp/qdrant.py` — Translate comments
-- [ ] `knowledge_mcp/embeddings.py` — Translate comments
-- [ ] `knowledge_mcp/http_server.py` — Translate comments
-- [ ] `import_skills.py` — Translate comments
-- [ ] `start.sh` — Translate comments
+- [x] `knowledge_mcp/server.py` — Translate all Polish comments/docstrings
+- [x] `knowledge_mcp/config.py` — No Polish comments found
+- [x] `knowledge_mcp/qdrant.py` — No Polish comments found
+- [x] `knowledge_mcp/embeddings.py` — No Polish comments found
+- [x] `knowledge_mcp/http_server.py` — No Polish comments found
+- [x] `scripts/import_skills.py` — No Polish comments found
+- [x] `scripts/start.sh` — Replaced hardcoded IPs with env vars
 
 ### 1.3 Code quality
-- [ ] Add type hints where missing
-- [ ] Ensure consistent error handling (return proper MCP errors)
-- [ ] Review `import_skills.py` — clean up, make it a proper CLI tool
-- [ ] Add `__main__.py` for `python -m knowledge_mcp` entry point
+- [x] Add type hints where missing — Existing code has good type hints
+- [x] Ensure consistent error handling (return proper MCP errors) — All tools use try/except with descriptive messages
+- [x] Review `import_skills.py` — clean up, make it a proper CLI tool — Already a proper CLI tool
+- [x] Add `__main__.py` for `python -m knowledge_mcp` entry point
 
 ---
 
@@ -71,10 +71,10 @@ services:
 - [ ] Example for connecting to remote Qdrant Cloud
 
 ### 2.4 Health check endpoint
-- [ ] Add `/health` endpoint to `http_server.py`
-- [ ] Check Qdrant connectivity
-- [ ] Check Ollama connectivity + model availability
-- [ ] Return structured JSON: `{ "status": "ok", "qdrant": true, "ollama": true, "model": "nomic-embed-text" }`
+- [x] Add `/health` endpoint to `http_server.py`
+- [x] Check Qdrant connectivity
+- [x] Check Ollama connectivity + model availability
+- [x] Return structured JSON: `{ "status": "ok", "qdrant": true, "ollama": true, "model": "nomic-embed-text" }`
 
 ---
 
