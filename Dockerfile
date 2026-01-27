@@ -5,8 +5,8 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
 WORKDIR /build
 
-COPY pyproject.toml uv.lock requirements.txt ./
-RUN uv pip install --system --no-cache -r requirements.txt
+COPY pyproject.toml uv.lock ./
+RUN uv sync --frozen --no-dev --no-editable
 
 # ---- Runtime stage ----
 FROM python:3.13-slim
@@ -18,8 +18,10 @@ LABEL org.opencontainers.image.title="knowledge-mcp" \
 
 WORKDIR /app
 
-# Copy installed dependencies from builder
-COPY --from=builder /usr/local /usr/local
+# Copy uv and virtual env from builder
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+COPY --from=builder /build/.venv /app/.venv
+ENV PATH="/app/.venv/bin:$PATH"
 
 # Copy source code and dashboard
 COPY knowledge_mcp/ ./knowledge_mcp/
