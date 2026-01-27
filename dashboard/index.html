@@ -982,7 +982,6 @@
         const API_BASE = '';
 
         let searchCount = 0;
-        let addCount = 0;
         let searchTimeout = null;
         let activeCollection = 'knowledge';
 
@@ -1092,12 +1091,12 @@
                 } else if (type === 'project') {
                     title = item.name;
                     const status = item.status || 'active';
-                    badge = `<span class="badge badge-${status}">${status}</span>`;
+                    badge = `<span class="badge badge-${escapeHtml(status)}">${escapeHtml(status)}</span>`;
                     meta = item.path || item.description || '';
                 } else if (type === 'private') {
                     title = item.title;
                     const ptype = item.private_type || 'note';
-                    badge = `<span class="badge badge-${ptype}">${ptype}</span>`;
+                    badge = `<span class="badge badge-${escapeHtml(ptype)}">${escapeHtml(ptype)}</span>`;
                     meta = new Date(item.created_at).toLocaleDateString();
                 }
 
@@ -1249,7 +1248,7 @@
                 const status = item.status || 'active';
                 body = `
                     <p><strong>ID:</strong> <code>${item.id}</code></p>
-                    <p><strong>Status:</strong> <span class="badge badge-${status}">${status}</span></p>
+                    <p><strong>Status:</strong> <span class="badge badge-${escapeHtml(status)}">${escapeHtml(status)}</span></p>
                     <p><strong>Path:</strong> ${item.path || 'none'}</p>
                     <p><strong>Tags:</strong> ${(item.tags || []).join(', ') || 'none'}</p>
                     <p><strong>Created:</strong> ${new Date(item.created_at).toLocaleString()}</p>
@@ -1261,7 +1260,7 @@
                 const ptype = item.private_type || 'note';
                 body = `
                     <p><strong>ID:</strong> <code>${item.id}</code></p>
-                    <p><strong>Type:</strong> <span class="badge badge-${ptype}">${ptype}</span></p>
+                    <p><strong>Type:</strong> <span class="badge badge-${escapeHtml(ptype)}">${escapeHtml(ptype)}</span></p>
                     <p><strong>Tags:</strong> ${(item.tags || []).join(', ') || 'none'}</p>
                     <p><strong>Created:</strong> ${new Date(item.created_at).toLocaleString()}</p>
                     <hr style="border-color: #2a2a2a; margin: 15px 0;">
@@ -1306,9 +1305,8 @@
                 const result = await res.json();
 
                 if (result.success) {
-                    addCount++;
-                    // stat-adds removed - counts tracked via stats API
                     showNotification('Knowledge added successfully!');
+                    loadStats();
                     closeAddModal('knowledge');
                     loadKnowledge();
                     e.target.reset();
@@ -1339,9 +1337,8 @@
                 const result = await res.json();
 
                 if (result.success) {
-                    addCount++;
-                    // stat-adds removed - counts tracked via stats API
                     showNotification('Skill added successfully!');
+                    loadStats();
                     closeAddModal('skill');
                     loadSkills();
                     e.target.reset();
@@ -1373,9 +1370,8 @@
                 const result = await res.json();
 
                 if (result.success) {
-                    addCount++;
-                    document.getElementById('stat-adds').textContent = addCount;
                     showNotification('Project added successfully!');
+                    loadStats();
                     closeAddModal('project');
                     loadProjects();
                     e.target.reset();
@@ -1405,9 +1401,8 @@
                 const result = await res.json();
 
                 if (result.success) {
-                    addCount++;
-                    document.getElementById('stat-adds').textContent = addCount;
                     showNotification('Private note added successfully!');
+                    loadStats();
                     closeAddModal('private');
                     loadPrivate();
                     e.target.reset();
