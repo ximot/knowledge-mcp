@@ -1136,7 +1136,7 @@
 
                 if (result.success) {
                     addCount++;
-                    document.getElementById('stat-adds').textContent = addCount;
+                    // stat-adds removed - counts tracked via stats API
                     showNotification('Knowledge added successfully!');
                     closeAddModal('knowledge');
                     loadKnowledge();
@@ -1169,7 +1169,7 @@
 
                 if (result.success) {
                     addCount++;
-                    document.getElementById('stat-adds').textContent = addCount;
+                    // stat-adds removed - counts tracked via stats API
                     showNotification('Skill added successfully!');
                     closeAddModal('skill');
                     loadSkills();
