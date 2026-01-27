@@ -199,8 +199,38 @@ async def api_projects(request):
     return JSONResponse({"results": results, "count": total})
 
 
+async def api_project_add(request):
+    """Add a project via POST."""
+    body = await request.json()
+    name = body.get("name", "").strip()
+    description = body.get("description", "").strip()
+    if not name:
+        return JSONResponse(
+            {"success": False, "error": "name is required"},
+            status_code=400,
+        )
+
+    pid = f"p-{name}"
+    now = datetime.utcnow().isoformat()
+    payload = {
+        "id": pid,
+        "name": name,
+        "path": body.get("path", ""),
+        "description": description,
+        "status": body.get("status", "active"),
+        "tags": body.get("tags", []),
+        "metadata": body.get("metadata", {}),
+        "created_at": now,
+        "updated_at": now,
+    }
+    vector = await get_embeddings(f"{name} {description}")
+    await _qdrant.ensure_collections()
+    await _qdrant.upsert(settings.projects_collection, pid, vector, payload)
+    return JSONResponse({"success": True, "id": pid})
+
+
 async def api_private(request):
-    """List or search private notes."""
+    """List or search private entries."""
     await _qdrant.ensure_collections()
     query = request.query_params.get("q", "")
     limit = min(int(request.query_params.get("limit", "50")), 200)
@@ -214,26 +244,60 @@ async def api_private(request):
     return JSONResponse({"results": results, "count": total})
 
 
+async def api_private_add(request):
+    """Add a private entry via POST."""
+    body = await request.json()
+    title = body.get("title", "").strip()
+    content = body.get("content", "").strip()
+    if not title or not content:
+        return JSONResponse(
+            {"success": False, "error": "title and content required"},
+            status_code=400,
+        )
+
+    priv_id = f"priv-{hashlib.sha256((title + content).encode()).hexdigest()[:12]}"
+    now = datetime.utcnow().isoformat()
+    payload = {
+        "id": priv_id,
+        "title": title,
+        "content": content,
+        "private_type": body.get("private_type", "note"),
+        "tags": body.get("tags", []),
+        "metadata": body.get("metadata", {}),
+        "created_at": now,
+        "updated_at": now,
+    }
+    vector = await get_embeddings(f"{title} {content}")
+    await _qdrant.ensure_collections()
+    await _qdrant.upsert(settings.private_collection, priv_id, vector, payload)
+    return JSONResponse({"success": True, "id": priv_id})
+
+
 async def api_stats(request):
     """Quick stats for the dashboard header."""
     await _qdrant.ensure_collections()
-    counts = {}
-    for name in [
-        settings.knowledge_collection,
-        settings.skills_collection,
-        settings.projects_collection,
-        settings.private_collection,
-    ]:
-        try:
-            counts[name] = (await _qdrant.client.count(name)).count
-        except Exception:
-            counts[name] = 0
+    try:
+        k_count = (await _qdrant.client.count(settings.knowledge_collection)).count
+    except Exception:
+        k_count = 0
+    try:
+        s_count = (await _qdrant.client.count(settings.skills_collection)).count
+    except Exception:
+        s_count = 0
+    try:
+        p_count = (await _qdrant.client.count(settings.projects_collection)).count
+    except Exception:
+        p_count = 0
+    try:
+        pr_count = (await _qdrant.client.count(settings.private_collection)).count
+    except Exception:
+        pr_count = 0
     return JSONResponse(
         {
-            "knowledge_count": counts[settings.knowledge_collection],
-            "skills_count": counts[settings.skills_collection],
-            "projects_count": counts[settings.projects_collection],
-            "private_count": counts[settings.private_collection],
+            "knowledge_count": k_count,
+            "skills_count": s_count,
+            "projects_count": p_count,
+            "private_count": pr_count,
             "active_sessions": 0,
         }
     )
@@ -349,7 +413,9 @@ def main():
         Route("/api/skills", api_skills, methods=["GET"]),
         Route("/api/skills", api_skill_add, methods=["POST"]),
         Route("/api/projects", api_projects, methods=["GET"]),
+        Route("/api/projects", api_project_add, methods=["POST"]),
         Route("/api/private", api_private, methods=["GET"]),
+        Route("/api/private", api_private_add, methods=["POST"]),
         Route("/api/stats", api_stats, methods=["GET"]),
         Route("/api/graph", api_graph, methods=["GET"]),
         # Dashboard UI
