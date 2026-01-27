@@ -1,0 +1,15 @@
+[Unit]
+Description=Knowledge MCP Server
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/ximot/knowledge-mcp
+ExecStart=/home/ximot/knowledge-mcp/start.sh
+Restart=on-failure
+RestartSec=5
+
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=default.target

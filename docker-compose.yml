@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  # Knowledge MCP Server (HTTP mode for remote access)
+  knowledge-mcp:
+    build: .
+    container_name: knowledge-mcp
+    restart: unless-stopped
+    ports:
+      - "8765:8765"
+    environment:
+      - QDRANT_HOST=qdrant
+      - QDRANT_PORT=6333
+      - OLLAMA_HOST=http://host.gateway.docker.internal:11434
+      - EMBEDDING_MODEL=nomic-embed-text
+      - VECTOR_SIZE=768
+      - MCP_PORT=8765
+    command: ["python", "knowledge_mcp/http_server.py"]
+    depends_on:
+      - qdrant
+    networks:
+      - knowledge-net
+    # For accessing host's Ollama
+    extra_hosts:
+      - "host.gateway.docker.internal:host-gateway"
+
+  # Qdrant Vector Database
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: qdrant
+    restart: unless-stopped
+    ports:
+      - "6333:6333"  # REST API
+      - "6334:6334"  # gRPC
+    volumes:
+      - qdrant_data:/qdrant/storage
+    environment:
+      - QDRANT__SERVICE__GRPC_PORT=6334
+    networks:
+      - knowledge-net
+
+networks:
+  knowledge-net:
+    driver: bridge
+
+volumes:
+  qdrant_data:
+    driver: local
