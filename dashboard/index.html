@@ -517,6 +517,136 @@
             color: #fff;
             z-index: 10;
         }
+
+        /* Unified Search */
+        .unified-search-wrapper {
+            margin-bottom: 25px;
+            position: relative;
+        }
+
+        .unified-search-input {
+            width: 100%;
+            padding: 14px 20px;
+            background: #1a1a1a;
+            border: 2px solid #2a2a2a;
+            border-radius: 12px;
+            color: #e0e0e0;
+            font-size: 16px;
+            transition: border-color 0.2s;
+        }
+
+        .unified-search-input:focus {
+            outline: none;
+            border-color: #3b82f6;
+        }
+
+        .unified-search-input::placeholder {
+            color: #666;
+        }
+
+        .unified-results {
+            display: none;
+            margin-top: 12px;
+            background: #1a1a1a;
+            border: 1px solid #2a2a2a;
+            border-radius: 12px;
+            padding: 10px;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        .unified-results.active {
+            display: block;
+        }
+
+        .unified-group-header {
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #888;
+            padding: 8px 12px 4px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .unified-group-header .badge {
+            font-size: 10px;
+            padding: 2px 8px;
+            border-radius: 10px;
+            color: #fff;
+            font-weight: 700;
+        }
+
+        .badge-knowledge { background: #3b82f6; }
+        .badge-skill { background: #22c55e; }
+        .badge-project { background: #f59e0b; }
+        .badge-private { background: #a855f7; }
+
+        .unified-item {
+            padding: 10px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.15s;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .unified-item:hover {
+            background: #252525;
+        }
+
+        .unified-item-badge {
+            font-size: 10px;
+            padding: 2px 8px;
+            border-radius: 10px;
+            color: #fff;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .unified-item-text {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .unified-item-title {
+            font-weight: 500;
+            color: #fff;
+            font-size: 14px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .unified-item-meta {
+            font-size: 12px;
+            color: #666;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .unified-item .score {
+            font-size: 11px;
+            color: #3b82f6;
+        }
+
+        .unified-no-results {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+            font-size: 14px;
+        }
+
+        .unified-searching {
+            text-align: center;
+            padding: 20px;
+            color: #888;
+            font-size: 14px;
+        }
     </style>
 </head>
 <body>
@@ -543,6 +673,12 @@
             </div>
         </header>
 
+        <!-- Unified Search -->
+        <div class="unified-search-wrapper">
+            <input type="text" class="unified-search-input" id="unified-search" placeholder="Search across all collections (knowledge, skills, projects, private)..." oninput="unifiedSearch(this.value)">
+            <div class="unified-results" id="unified-results"></div>
+        </div>
+
         <div class="grid">
             <div class="card card-stat">
                 <div class="stat-value" id="stat-knowledge">-</div>
@@ -553,16 +689,16 @@
                 <div class="stat-label">Skills</div>
             </div>
             <div class="card card-stat">
+                <div class="stat-value" id="stat-projects">-</div>
+                <div class="stat-label">Projects</div>
+            </div>
+            <div class="card card-stat">
+                <div class="stat-value" id="stat-private">-</div>
+                <div class="stat-label">Private Notes</div>
+            </div>
+            <div class="card card-stat">
                 <div class="stat-value" id="stat-searches">0</div>
                 <div class="stat-label">Searches (session)</div>
-            </div>
-            <div class="card card-stat">
-                <div class="stat-value" id="stat-adds">0</div>
-                <div class="stat-label">Added (session)</div>
-            </div>
-            <div class="card card-stat">
-                <div class="stat-value" id="stat-sessions">-</div>
-                <div class="stat-label">Active Sessions</div>
             </div>
         </div>
 
@@ -847,10 +983,80 @@
             }, 300);
         }
 
+        // Unified search across all collections
+        let unifiedTimeout = null;
+        const COLLECTION_META = {
+            knowledge: { label: 'Knowledge', badge: 'badge-knowledge', endpoint: '/api/knowledge', titleKey: 'title' },
+            skill:     { label: 'Skills',    badge: 'badge-skill',     endpoint: '/api/skills',    titleKey: 'name' },
+            project:   { label: 'Projects',  badge: 'badge-project',   endpoint: '/api/projects',  titleKey: 'name' },
+            private:   { label: 'Private',   badge: 'badge-private',   endpoint: '/api/private',   titleKey: 'title' },
+        };
+
+        async function unifiedSearch(query) {
+            clearTimeout(unifiedTimeout);
+            const resultsEl = document.getElementById('unified-results');
+
+            if (!query.trim()) {
+                resultsEl.classList.remove('active');
+                return;
+            }
+
+            unifiedTimeout = setTimeout(async () => {
+                searchCount++;
+                document.getElementById('stat-searches').textContent = searchCount;
+                resultsEl.classList.add('active');
+                resultsEl.innerHTML = '<div class="unified-searching">Searching...</div>';
+
+                const encoded = encodeURIComponent(query.trim());
+                const fetches = Object.entries(COLLECTION_META).map(([type, meta]) =>
+                    fetch(`${API_BASE}${meta.endpoint}?q=${encoded}&limit=10`)
+                        .then(r => r.json())
+                        .then(data => ({ type, meta, results: data.results || [] }))
+                        .catch(() => ({ type, meta, results: [] }))
+                );
+
+                const groups = await Promise.all(fetches);
+                let html = '';
+                let totalResults = 0;
+
+                for (const { type, meta, results } of groups) {
+                    if (results.length === 0) continue;
+                    totalResults += results.length;
+
+                    html += `<div class="unified-group-header">${meta.label} <span class="badge ${meta.badge}">${results.length}</span></div>`;
+
+                    for (const item of results) {
+                        const title = item[meta.titleKey] || item.id;
+                        const score = item.score ? `<span class="score">${(item.score * 100).toFixed(0)}%</span>` : '';
+                        const tags = (item.tags || []).slice(0, 3).map(t => escapeHtml(t)).join(', ');
+                        const cacheKey = `unified-${type}-${item.id}`;
+                        itemsCache[cacheKey] = item;
+
+                        html += `
+                            <div class="unified-item" onclick="showDetail(itemsCache['${cacheKey}'], '${type}')">
+                                <span class="unified-item-badge ${meta.badge}">${meta.label.slice(0, 1)}</span>
+                                <div class="unified-item-text">
+                                    <div class="unified-item-title">${escapeHtml(title)}</div>
+                                    <div class="unified-item-meta">${tags || 'no tags'}</div>
+                                </div>
+                                ${score}
+                            </div>
+                        `;
+                    }
+                }
+
+                if (totalResults === 0) {
+                    html = '<div class="unified-no-results">No results found across any collection</div>';
+                }
+
+                resultsEl.innerHTML = html;
+            }, 300);
+        }
+
         // Detail modal
         function showDetail(item, type) {
             const modal = document.getElementById('detail-modal');
-            const title = type === 'knowledge' ? item.title : item.name;
+            let title = item.title || item.name || item.id;
             document.getElementById('modal-title').textContent = title;
 
             let body = '';
@@ -864,7 +1070,7 @@
                     <hr style="border-color: #2a2a2a; margin: 15px 0;">
                     <div>${markdownToHtml(item.content)}</div>
                 `;
-            } else {
+            } else if (type === 'skill') {
                 body = `
                     <p><strong>ID:</strong> <code>${item.id}</code></p>
                     <p><strong>Version:</strong> ${item.version}</p>
@@ -873,6 +1079,23 @@
                     <hr style="border-color: #2a2a2a; margin: 15px 0;">
                     <p><strong>Prompt:</strong></p>
                     <pre>${item.prompt || 'N/A (use skill_get to fetch full prompt)'}</pre>
+                `;
+            } else if (type === 'project') {
+                body = `
+                    <p><strong>ID:</strong> <code>${item.id}</code></p>
+                    <p><strong>Status:</strong> ${item.status || 'unknown'}</p>
+                    <p><strong>Path:</strong> ${item.path || 'none'}</p>
+                    <p><strong>Tags:</strong> ${(item.tags || []).join(', ') || 'none'}</p>
+                    <hr style="border-color: #2a2a2a; margin: 15px 0;">
+                    <div>${markdownToHtml(item.description || '')}</div>
+                `;
+            } else if (type === 'private') {
+                body = `
+                    <p><strong>ID:</strong> <code>${item.id}</code></p>
+                    <p><strong>Type:</strong> ${item.private_type || 'note'}</p>
+                    <p><strong>Tags:</strong> ${(item.tags || []).join(', ') || 'none'}</p>
+                    <hr style="border-color: #2a2a2a; margin: 15px 0;">
+                    <div>${markdownToHtml(item.content || '')}</div>
                 `;
             }
 
@@ -1016,7 +1239,8 @@
                 const data = await res.json();
                 document.getElementById('stat-knowledge').textContent = data.knowledge_count;
                 document.getElementById('stat-skills').textContent = data.skills_count;
-                document.getElementById('stat-sessions').textContent = data.active_sessions || 0;
+                document.getElementById('stat-projects').textContent = data.projects_count || 0;
+                document.getElementById('stat-private').textContent = data.private_count || 0;
             } catch (e) {
                 console.error('Stats refresh error:', e);
             }
