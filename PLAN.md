@@ -41,11 +41,11 @@ Works with Claude Code, OpenCode, and any MCP-compatible client. Powered by Qdra
 ## Phase 2: Docker (Priority: HIGH)
 
 ### 2.1 Dockerfile
-- [ ] Multi-stage build: builder (install deps) → runtime (slim image)
-- [ ] Base: `python:3.13-slim`
-- [ ] Non-root user
-- [ ] Health check endpoint (`/health`)
-- [ ] Labels (version, description, repo URL)
+- [x] Multi-stage build: builder (install deps) → runtime (slim image)
+- [x] Base: `python:3.13-slim`
+- [x] Non-root user
+- [x] Health check endpoint (`/health`)
+- [x] Labels (version, description, repo URL)
 
 ### 2.2 docker-compose.yml — All-in-One
 Full stack for quick start:
@@ -55,11 +55,11 @@ services:
   qdrant:          # Vector DB (port 6333)
   ollama:          # Embeddings (port 11434)
 ```
-- [ ] Auto-pull `nomic-embed-text` model on first start (init container or entrypoint script)
-- [ ] Shared network
-- [ ] Named volumes for Qdrant data and Ollama models
-- [ ] Health checks for all services
-- [ ] `.env` file support
+- [x] Auto-pull `nomic-embed-text` model on first start (init container or entrypoint script)
+- [x] Shared network
+- [x] Named volumes for Qdrant data and Ollama models
+- [x] Health checks for all services
+- [x] `.env` file support
 
 ### 2.3 docker-compose.external.yml — BYO Backend
 Minimal — just the MCP server:
@@ -67,8 +67,8 @@ Minimal — just the MCP server:
 services:
   knowledge-mcp:  # Points to external Qdrant + Ollama via env vars
 ```
-- [ ] Document required env vars for external connections
-- [ ] Example for connecting to remote Qdrant Cloud
+- [x] Document required env vars for external connections
+- [x] Example for connecting to remote Qdrant Cloud
 
 ### 2.4 Health check endpoint
 - [x] Add `/health` endpoint to `http_server.py`

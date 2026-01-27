@@ -1,0 +1,54 @@
+# BYO Backend: knowledge-mcp only — bring your own Qdrant and Ollama
+#
+# Usage:
+#   docker compose -f docker-compose.external.yml up -d
+#
+# Required environment variables (set in .env or export):
+#   QDRANT_HOST     - Qdrant server hostname or IP (e.g., qdrant.example.com)
+#   QDRANT_PORT     - Qdrant REST port (default: 6333)
+#   OLLAMA_HOST     - Full Ollama URL (e.g., http://ollama.example.com:11434)
+#
+# Optional:
+#   QDRANT_API_KEY  - API key for Qdrant Cloud or authenticated instances
+#   QDRANT_HTTPS    - Set to "true" for Qdrant Cloud (default: false)
+#   EMBEDDING_MODEL - Embedding model name (default: nomic-embed-text)
+#   VECTOR_SIZE     - Embedding dimensions (default: 768)
+#   MCP_PORT        - Server port (default: 8765)
+#
+# Example: Connecting to Qdrant Cloud
+#   QDRANT_HOST=abc123.us-east4-0.gcp.cloud.qdrant.io
+#   QDRANT_PORT=6333
+#   QDRANT_API_KEY=your-api-key-here
+#   QDRANT_HTTPS=true
+#   OLLAMA_HOST=http://localhost:11434
+#
+# Example: Connecting to services on the Docker host
+#   QDRANT_HOST=host.docker.internal
+#   QDRANT_PORT=6333
+#   OLLAMA_HOST=http://host.docker.internal:11434
+
+services:
+  knowledge-mcp:
+    build: .
+    container_name: knowledge-mcp
+    restart: unless-stopped
+    ports:
+      - "${MCP_PORT:-8765}:8765"
+    environment:
+      - QDRANT_HOST=${QDRANT_HOST:?Set QDRANT_HOST in .env or environment}
+      - QDRANT_PORT=${QDRANT_PORT:-6333}
+      - QDRANT_API_KEY=${QDRANT_API_KEY:-}
+      - QDRANT_HTTPS=${QDRANT_HTTPS:-false}
+      - OLLAMA_HOST=${OLLAMA_HOST:?Set OLLAMA_HOST in .env or environment}
+      - EMBEDDING_MODEL=${EMBEDDING_MODEL:-nomic-embed-text}
+      - VECTOR_SIZE=${VECTOR_SIZE:-768}
+      - MCP_PORT=8765
+      - MCP_HOST=0.0.0.0
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8765/health')"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3

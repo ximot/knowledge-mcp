@@ -1,43 +1,85 @@
-version: '3.8'
+# All-in-One deployment: knowledge-mcp + Qdrant + Ollama
+# Quick start: docker compose up -d
 
 services:
-  # Knowledge MCP Server (HTTP mode for remote access)
   knowledge-mcp:
     build: .
     container_name: knowledge-mcp
     restart: unless-stopped
     ports:
-      - "8765:8765"
+      - "${MCP_PORT:-8765}:8765"
     environment:
       - QDRANT_HOST=qdrant
       - QDRANT_PORT=6333
-      - OLLAMA_HOST=http://host.gateway.docker.internal:11434
-      - EMBEDDING_MODEL=nomic-embed-text
-      - VECTOR_SIZE=768
+      - OLLAMA_HOST=http://ollama:11434
+      - EMBEDDING_MODEL=${EMBEDDING_MODEL:-nomic-embed-text}
+      - VECTOR_SIZE=${VECTOR_SIZE:-768}
       - MCP_PORT=8765
-    command: ["python", "knowledge_mcp/http_server.py"]
+      - MCP_HOST=0.0.0.0
     depends_on:
-      - qdrant
+      qdrant:
+        condition: service_healthy
+      ollama-init:
+        condition: service_completed_successfully
     networks:
       - knowledge-net
-    # For accessing host's Ollama
-    extra_hosts:
-      - "host.gateway.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8765/health')"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
 
-  # Qdrant Vector Database
   qdrant:
     image: qdrant/qdrant:latest
     container_name: qdrant
     restart: unless-stopped
     ports:
-      - "6333:6333"  # REST API
-      - "6334:6334"  # gRPC
+      - "${QDRANT_PORT:-6333}:6333"
+      - "${QDRANT_GRPC_PORT:-6334}:6334"
     volumes:
       - qdrant_data:/qdrant/storage
     environment:
       - QDRANT__SERVICE__GRPC_PORT=6334
     networks:
       - knowledge-net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:6333/readyz || exit 1"]
+      interval: 10s
+      timeout: 5s
+      start_period: 5s
+      retries: 3
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    restart: unless-stopped
+    ports:
+      - "${OLLAMA_PORT:-11434}:11434"
+    volumes:
+      - ollama_models:/root/.ollama
+    networks:
+      - knowledge-net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:11434/api/tags || exit 1"]
+      interval: 10s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+
+  # Init container: pulls the embedding model on first start
+  ollama-init:
+    image: ollama/ollama:latest
+    container_name: ollama-init
+    depends_on:
+      ollama:
+        condition: service_healthy
+    entrypoint: ["sh", "-c", "ollama pull ${EMBEDDING_MODEL:-nomic-embed-text}"]
+    environment:
+      - OLLAMA_HOST=http://ollama:11434
+    networks:
+      - knowledge-net
+    restart: "no"
 
 networks:
   knowledge-net:
@@ -45,4 +87,6 @@ networks:
 
 volumes:
   qdrant_data:
+    driver: local
+  ollama_models:
     driver: local
