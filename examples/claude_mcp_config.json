@@ -1,0 +1,23 @@
+{
+  "_comment": "Example MCP configuration for Claude Code. Copy the relevant section to your ~/.claude/settings.json",
+
+  "mcpServers": {
+
+    "_comment_http": "Option 1: HTTP/SSE mode (recommended when running via Docker)",
+    "knowledge-http": {
+      "url": "http://localhost:8765/mcp"
+    },
+
+    "_comment_stdio": "Option 2: stdio mode (local Python install, no Docker needed)",
+    "knowledge-stdio": {
+      "command": "python",
+      "args": ["-m", "knowledge_mcp.server"],
+      "cwd": "/path/to/knowledge-mcp",
+      "env": {
+        "QDRANT_HOST": "localhost",
+        "QDRANT_PORT": "6333",
+        "OLLAMA_HOST": "http://localhost:11434"
+      }
+    }
+  }
+}

@@ -328,6 +328,7 @@ knowledge-mcp/
 ├── scripts/
 │   ├── import_skills.py   # Bulk SKILL.md importer
 │   └── start.sh           # Shell startup script
+├── examples/                   # Sample SKILL.md files and config snippets
 ├── docker-compose.yml          # All-in-one (MCP + Qdrant + Ollama)
 ├── docker-compose.external.yml # BYO backend (MCP server only)
 ├── Dockerfile

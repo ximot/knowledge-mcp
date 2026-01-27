@@ -176,16 +176,24 @@ knowledge-mcp/
 ## Phase 6: Polish & Release (Priority: MEDIUM)
 
 ### 6.1 Testing
+- [x] Verify all Python files compile (`py_compile` for each)
+- [x] Verify docker-compose.yml and docker-compose.external.yml are valid YAML
+- [x] Verify Dockerfile syntax (multi-stage build, labels, healthcheck)
+- [x] Verify pyproject.toml is valid and has description + repo URLs
 - [ ] Ensure `docker compose up` works from clean state
 - [ ] Test MCP connection from Claude Code
 - [ ] Test all 24 tools (CRUD for each collection)
 - [ ] Test import_skills.py with sample SKILL.md files
 
 ### 6.2 Sample data
-- [ ] Add `examples/` directory with sample SKILL.md files for import
-- [ ] Add example MCP client config snippets
+- [x] Add `examples/` directory with sample SKILL.md files for import
+- [x] Add example MCP client config snippets
 
 ### 6.3 Release
+- [x] Review all files for consistency
+- [x] Verify .gitignore covers Python, Docker, IDE, .env, logs, etc.
+- [x] Verify pyproject.toml has repo description and URLs
+- [x] Final README review — Quick Start, project structure updated
 - [ ] Create GitHub repo: `ximot/knowledge-mcp`
 - [ ] Push clean code
 - [ ] Add repo description + topics (mcp, rag, knowledge-base, qdrant, ollama, claude-code)
