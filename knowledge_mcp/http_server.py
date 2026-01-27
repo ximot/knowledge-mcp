@@ -42,6 +42,7 @@ DASHBOARD_DIR = Path(__file__).resolve().parent.parent / "dashboard"
 # Health endpoint
 # ---------------------------------------------------------------------------
 
+
 async def health_check(request):
     """
     Health check endpoint that verifies connectivity to Qdrant and Ollama.
@@ -52,7 +53,7 @@ async def health_check(request):
         "status": "ok",
         "qdrant": False,
         "ollama": False,
-        "model": settings.embedding_model
+        "model": settings.embedding_model,
     }
 
     async with httpx.AsyncClient(timeout=5.0) as client:
@@ -90,6 +91,7 @@ async def health_check(request):
 # Dashboard REST API  (used by dashboard/index.html)
 # ---------------------------------------------------------------------------
 
+
 async def api_knowledge(request):
     """List or search knowledge entries."""
     await _qdrant.ensure_collections()
@@ -98,14 +100,10 @@ async def api_knowledge(request):
 
     if query:
         vector = await get_embeddings(query)
-        results = await _qdrant.search(
-            settings.knowledge_collection, vector, limit=limit
-        )
+        results = await _qdrant.search(settings.knowledge_collection, vector, limit=limit)
         return JSONResponse({"results": results, "count": len(results)})
 
-    results, total = await _qdrant.list_all(
-        settings.knowledge_collection, limit=limit
-    )
+    results, total = await _qdrant.list_all(settings.knowledge_collection, limit=limit)
     return JSONResponse({"results": results, "count": total})
 
 
@@ -146,14 +144,10 @@ async def api_skills(request):
 
     if query:
         vector = await get_embeddings(query)
-        results = await _qdrant.search(
-            settings.skills_collection, vector, limit=limit
-        )
+        results = await _qdrant.search(settings.skills_collection, vector, limit=limit)
         return JSONResponse({"results": results, "count": len(results)})
 
-    results, total = await _qdrant.list_all(
-        settings.skills_collection, limit=limit
-    )
+    results, total = await _qdrant.list_all(settings.skills_collection, limit=limit)
     return JSONResponse({"results": results, "count": total})
 
 
@@ -191,22 +185,20 @@ async def api_stats(request):
     """Quick stats for the dashboard header."""
     await _qdrant.ensure_collections()
     try:
-        k_count = (
-            await _qdrant.client.count(settings.knowledge_collection)
-        ).count
+        k_count = (await _qdrant.client.count(settings.knowledge_collection)).count
     except Exception:
         k_count = 0
     try:
-        s_count = (
-            await _qdrant.client.count(settings.skills_collection)
-        ).count
+        s_count = (await _qdrant.client.count(settings.skills_collection)).count
     except Exception:
         s_count = 0
-    return JSONResponse({
-        "knowledge_count": k_count,
-        "skills_count": s_count,
-        "active_sessions": 0,
-    })
+    return JSONResponse(
+        {
+            "knowledge_count": k_count,
+            "skills_count": s_count,
+            "active_sessions": 0,
+        }
+    )
 
 
 async def api_graph(request):
@@ -219,38 +211,38 @@ async def api_graph(request):
     tag_to_node_ids: dict[str, list[str]] = {}
 
     # Fetch knowledge entries
-    k_results, _ = await _qdrant.list_all(
-        settings.knowledge_collection, limit=200
-    )
+    k_results, _ = await _qdrant.list_all(settings.knowledge_collection, limit=200)
     for item in k_results:
         node_id = item.get("id", "")
-        nodes.append({
-            "id": node_id,
-            "label": item.get("title", node_id[:10]),
-            "type": "knowledge",
-            "title": item.get("title", ""),
-            "description": item.get("content", "")[:200],
-            "knowledge_type": item.get("knowledge_type", ""),
-            "tags": item.get("tags", []),
-        })
+        nodes.append(
+            {
+                "id": node_id,
+                "label": item.get("title", node_id[:10]),
+                "type": "knowledge",
+                "title": item.get("title", ""),
+                "description": item.get("content", "")[:200],
+                "knowledge_type": item.get("knowledge_type", ""),
+                "tags": item.get("tags", []),
+            }
+        )
         for tag in item.get("tags", []):
             tag_stats[tag] = tag_stats.get(tag, 0) + 1
             tag_to_node_ids.setdefault(tag, []).append(node_id)
 
     # Fetch skills
-    s_results, _ = await _qdrant.list_all(
-        settings.skills_collection, limit=200
-    )
+    s_results, _ = await _qdrant.list_all(settings.skills_collection, limit=200)
     for item in s_results:
         node_id = item.get("id", "")
-        nodes.append({
-            "id": node_id,
-            "label": item.get("name", node_id[:10]),
-            "type": "skill",
-            "title": item.get("name", ""),
-            "description": item.get("description", ""),
-            "tags": item.get("tags", []),
-        })
+        nodes.append(
+            {
+                "id": node_id,
+                "label": item.get("name", node_id[:10]),
+                "type": "skill",
+                "title": item.get("name", ""),
+                "description": item.get("description", ""),
+                "tags": item.get("tags", []),
+            }
+        )
         for tag in item.get("tags", []):
             tag_stats[tag] = tag_stats.get(tag, 0) + 1
             tag_to_node_ids.setdefault(tag, []).append(node_id)
@@ -266,16 +258,19 @@ async def api_graph(request):
     for (a, b), tags in edge_map.items():
         edges.append({"from": a, "to": b, "tags": tags})
 
-    return JSONResponse({
-        "nodes": nodes,
-        "edges": edges,
-        "tag_stats": tag_stats,
-    })
+    return JSONResponse(
+        {
+            "nodes": nodes,
+            "edges": edges,
+            "tag_stats": tag_stats,
+        }
+    )
 
 
 # ---------------------------------------------------------------------------
 # Dashboard static files
 # ---------------------------------------------------------------------------
+
 
 async def dashboard_index(request):
     """Serve dashboard/index.html."""
@@ -291,6 +286,7 @@ async def dashboard_index(request):
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
+
 
 def main():
     port = int(os.getenv("MCP_PORT", "8765"))
