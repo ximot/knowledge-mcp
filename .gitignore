@@ -37,3 +37,6 @@ Thumbs.db
 
 # Docker
 docker-compose.override.yml
+
+# uv
+.python-version

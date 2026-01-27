@@ -40,6 +40,8 @@ Works with **Claude Code**, **OpenCode**, and any MCP-compatible client. Powered
 
 ## Quick Start
 
+### Docker (recommended)
+
 **Prerequisites:** Docker and Docker Compose installed.
 
 ```bash
@@ -52,6 +54,33 @@ cp .env.example .env
 
 # 3. Start all services
 docker compose up -d
+```
+
+### Local with uv (recommended for development)
+
+**Prerequisites:** [uv](https://docs.astral.sh/uv/) installed, Qdrant and Ollama running.
+
+```bash
+# 1. Clone the repository
+git clone https://github.com/ximot/knowledge-mcp.git
+cd knowledge-mcp
+
+# 2. Install dependencies
+uv sync
+
+# 3. Run the MCP server
+uv run python -m knowledge_mcp
+```
+
+### Local with pip (alternative)
+
+```bash
+git clone https://github.com/ximot/knowledge-mcp.git
+cd knowledge-mcp
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+python -m knowledge_mcp
 ```
 
 This starts three containers:
@@ -288,17 +317,15 @@ Status is `"ok"` when both backends are reachable, `"degraded"` otherwise (retur
 
 ## Development
 
-### Local Setup
+### Local Setup (uv — recommended)
 
 ```bash
-# Clone and create virtualenv
+# Clone the repository
 git clone https://github.com/ximot/knowledge-mcp.git
 cd knowledge-mcp
-python -m venv .venv
-source .venv/bin/activate
 
-# Install dependencies
-pip install -r requirements.txt
+# Install all dependencies (including dev tools: ruff, mypy)
+uv sync --extra dev
 
 # Start Qdrant (if not running)
 docker run -d --name qdrant -p 6333:6333 qdrant/qdrant
@@ -307,10 +334,26 @@ docker run -d --name qdrant -p 6333:6333 qdrant/qdrant
 ollama pull nomic-embed-text
 
 # Run in stdio mode
-python -m knowledge_mcp.server
+uv run python -m knowledge_mcp.server
 
 # Run in HTTP mode
-python knowledge_mcp/http_server.py
+uv run python knowledge_mcp/http_server.py
+
+# Lint and format
+uv run ruff check --fix .
+uv run ruff format .
+```
+
+### Local Setup (pip — alternative)
+
+```bash
+git clone https://github.com/ximot/knowledge-mcp.git
+cd knowledge-mcp
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+
+python -m knowledge_mcp.server
 ```
 
 ### Project Structure
