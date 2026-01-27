@@ -72,7 +72,10 @@ async def health_check(request):
             if response.status_code == 200:
                 data = response.json()
                 models = [m.get("name", "") for m in data.get("models", [])]
-                health_status["ollama"] = settings.embedding_model in models
+                health_status["ollama"] = any(
+                    m == settings.embedding_model or m.startswith(f"{settings.embedding_model}:")
+                    for m in models
+                )
                 health_status["available_models"] = models
             else:
                 health_status["ollama"] = False

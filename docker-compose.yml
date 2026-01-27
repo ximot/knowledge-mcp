@@ -1,5 +1,6 @@
 # All-in-One deployment: knowledge-mcp + Qdrant + Ollama
 # Quick start: docker compose up -d
+# Compatible with Docker and Podman (podman-compose)
 
 services:
   knowledge-mcp:
@@ -31,7 +32,7 @@ services:
       retries: 3
 
   qdrant:
-    image: qdrant/qdrant:latest
+    image: docker.io/qdrant/qdrant:latest
     container_name: qdrant
     restart: unless-stopped
     ports:
@@ -44,14 +45,15 @@ services:
     networks:
       - knowledge-net
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:6333/readyz || exit 1"]
+      # Qdrant image has bash but no curl/wget — use /dev/tcp
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/localhost/6333' || exit 1"]
       interval: 10s
       timeout: 5s
       start_period: 5s
       retries: 3
 
   ollama:
-    image: ollama/ollama:latest
+    image: docker.io/ollama/ollama:latest
     container_name: ollama
     restart: unless-stopped
     ports:
@@ -61,7 +63,8 @@ services:
     networks:
       - knowledge-net
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:11434/api/tags || exit 1"]
+      # Ollama image only has the ollama binary — no curl/wget
+      test: ["CMD", "ollama", "list"]
       interval: 10s
       timeout: 5s
       start_period: 10s
@@ -69,7 +72,7 @@ services:
 
   # Init container: pulls the embedding model on first start
   ollama-init:
-    image: ollama/ollama:latest
+    image: docker.io/ollama/ollama:latest
     container_name: ollama-init
     depends_on:
       ollama:
