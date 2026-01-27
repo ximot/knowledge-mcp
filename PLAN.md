@@ -119,14 +119,14 @@ MCP_PORT=8765
 ## Phase 4: Dashboard (Priority: MEDIUM)
 
 ### 4.1 Review current state
-- [ ] Audit `dashboard/` directory — what's there, does it work?
-- [ ] Identify dependencies and build process
-- [ ] Fix any hardcoded URLs/configs
+- [x] Audit `dashboard/` directory — what's there, does it work?
+- [x] Identify dependencies and build process
+- [x] Fix any hardcoded URLs/configs
 
 ### 4.2 Integration
-- [ ] Serve dashboard from MCP server (static files) or separate container
-- [ ] Add to docker-compose as optional service
-- [ ] Document how to access it
+- [x] Serve dashboard from MCP server (static files) or separate container
+- [x] Add to docker-compose as optional service
+- [x] Document how to access it
 
 ---
 
@@ -137,7 +137,7 @@ MCP_PORT=8765
 - [ ] Remove tracked files that should be ignored (`.venv/`, `__pycache__/`, `wrapper.log`, `.claude/`)
 - [ ] Clean git history if needed (remove any secrets/IPs from history)
 
-### 5.2 GitHub repo structure
+### 5.2 GitHub repo structure (done — matches target layout)
 ```
 knowledge-mcp/
 ├── knowledge_mcp/
@@ -166,9 +166,9 @@ knowledge-mcp/
 ```
 
 ### 5.3 Files to add
-- [ ] `LICENSE` — MIT
-- [ ] `CONTRIBUTING.md` — basic contribution guidelines
-- [ ] `pyproject.toml` — proper Python package metadata
+- [x] `LICENSE` — MIT
+- [x] `CONTRIBUTING.md` — basic contribution guidelines
+- [x] `pyproject.toml` — proper Python package metadata
 - [ ] `.github/workflows/ci.yml` — basic CI (lint, type check, Docker build test)
 
 ---

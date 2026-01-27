@@ -4,7 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Knowledge MCP Server - a RAG (Retrieval-Augmented Generation) server for Claude Code that stores knowledge entries and skills (reusable prompts) in Qdrant vector database with embeddings from Ollama (nomic-embed-text model).
+Knowledge MCP Server — a self-hosted RAG (Retrieval-Augmented Generation) knowledge base for AI coding assistants. Stores knowledge entries, skills (reusable prompts), project context, and private notes in a Qdrant vector database with embeddings from Ollama (nomic-embed-text).
+
+Works with Claude Code, OpenCode, and any MCP-compatible client.
 
 ## Commands
 
@@ -13,37 +15,53 @@ Knowledge MCP Server - a RAG (Retrieval-Augmented Generation) server for Claude 
 pip install -r requirements.txt
 
 # Run MCP server (stdio mode for Claude Code)
-python -m knowledge_mcp.server
+python -m knowledge_mcp
 
-# Run HTTP server for remote access
+# Run HTTP server (remote access + dashboard)
 python knowledge_mcp/http_server.py
 
 # Import skills from SKILL.md files
-python import_skills.py /path/to/skills/directory
-python import_skills.py /path/to/single/SKILL.md
+python scripts/import_skills.py /path/to/skills/directory
+python scripts/import_skills.py /path/to/single/SKILL.md
 
-# Docker deployment
-docker-compose up -d
+# Docker — full stack (MCP + Qdrant + Ollama)
+docker compose up -d
+
+# Docker — MCP server only (bring your own Qdrant + Ollama)
+docker compose -f docker-compose.external.yml up -d
+
+# Install as Python package (editable)
+pip install -e .
 ```
 
 ## Architecture
 
 ```
 knowledge_mcp/
-├── server.py      # Main MCP server - FastMCP tools for knowledge and skills CRUD
-├── config.py      # Settings dataclass loading from environment variables
-├── qdrant.py      # QdrantService - async client wrapper for vector operations
-├── embeddings.py  # Ollama client for generating nomic-embed-text embeddings
-└── http_server.py # HTTP/SSE transport wrapper using uvicorn for remote access
+├── __init__.py     # Package init, exports mcp, main, settings
+├── __main__.py     # Entry point for: python -m knowledge_mcp
+├── server.py       # Main MCP server — FastMCP tools for all CRUD operations
+├── config.py       # Settings dataclass, loaded from environment variables
+├── qdrant.py       # QdrantService — async client wrapper for vector operations
+├── embeddings.py   # Ollama client for generating nomic-embed-text embeddings
+└── http_server.py  # HTTP/SSE transport, /health endpoint, dashboard REST API
+
+dashboard/
+└── index.html      # Web dashboard (served at /dashboard by http_server.py)
+
+scripts/
+├── import_skills.py              # CLI tool for bulk SKILL.md import
+├── start.sh                      # Shell startup helper
+└── knowledge-mcp.service.example # Systemd unit template
 ```
 
 **Data flow**: MCP tool call → Pydantic input validation → get_embeddings() → QdrantService → Qdrant DB
 
 **Collections**: Four Qdrant collections with cosine similarity:
-- `knowledge` - entries with id, title, content, knowledge_type, tags, source, metadata
-- `skills` - prompts with id, name, description, prompt, tags, version, examples
-- `projects` - project metadata with id, name, path, description, status, tags, metadata
-- `private` - personal notes with id, title, content, private_type, tags, metadata
+- `knowledge` — entries with id, title, content, knowledge_type, tags, source, metadata
+- `skills` — prompts with id, name, description, prompt, tags, version, examples
+- `projects` — project metadata with id, name, path, description, status, tags, metadata
+- `private` — personal notes with id, title, content, private_type, tags, metadata
 
 **IDs**:
 - Knowledge: `k-{sha256(title+content)[:12]}`
@@ -54,15 +72,28 @@ knowledge_mcp/
 ## Environment Variables
 
 ```bash
-QDRANT_HOST=localhost    # Qdrant server host
-QDRANT_PORT=6333         # Qdrant REST port
-QDRANT_API_KEY=          # Optional auth
-QDRANT_HTTPS=false       # Use HTTPS
+QDRANT_HOST=localhost         # Qdrant server host
+QDRANT_PORT=6333              # Qdrant REST port
+QDRANT_API_KEY=               # Optional API key for Qdrant Cloud
+QDRANT_HTTPS=false            # Use HTTPS for Qdrant
 
-OLLAMA_HOST=http://localhost:11434
-EMBEDDING_MODEL=nomic-embed-text
-VECTOR_SIZE=768          # nomic-embed-text dimension
+OLLAMA_HOST=http://localhost:11434  # Ollama server URL
+EMBEDDING_MODEL=nomic-embed-text    # Embedding model name
+VECTOR_SIZE=768                     # Embedding vector dimension
+
+MCP_HOST=0.0.0.0              # HTTP server bind address
+MCP_PORT=8765                 # HTTP server port
 ```
+
+## HTTP Endpoints
+
+- `/health` — Health check (Qdrant + Ollama connectivity)
+- `/dashboard` — Web dashboard UI
+- `/api/knowledge` — GET (list/search) / POST (add) knowledge entries
+- `/api/skills` — GET (list/search) / POST (add) skills
+- `/api/stats` — GET collection counts
+- `/api/graph` — GET tag-based graph data for visualization
+- `/mcp` — MCP protocol endpoint
 
 ## MCP Tools
 

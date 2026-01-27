@@ -19,8 +19,9 @@ WORKDIR /app
 # Copy installed dependencies from builder
 COPY --from=builder /install /usr/local
 
-# Copy source code
+# Copy source code and dashboard
 COPY knowledge_mcp/ ./knowledge_mcp/
+COPY dashboard/ ./dashboard/
 
 # Create non-root user
 RUN useradd -m -u 1000 mcp && chown -R mcp:mcp /app

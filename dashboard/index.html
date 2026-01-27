@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="pl">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -712,31 +712,22 @@
     <div class="notification" id="notification"></div>
 
     <script>
-        const API_BASE = window.location.hostname === 'localhost'
-            ? 'http://localhost:8766'
-            : `http://${window.location.hostname}:8766`;
-        const QDRANT_BASE = window.location.hostname === 'localhost'
-            ? 'http://localhost:6333'
-            : `http://${window.location.hostname}:6333`;
-        const OLLAMA_BASE = window.location.hostname === 'localhost'
-            ? 'http://localhost:11434'
-            : `http://${window.location.hostname}:11434`;
-        const MCP_BASE = window.location.hostname === 'localhost'
-            ? 'http://localhost:8765'
-            : `http://${window.location.hostname}:8765`;
+        // Use relative URLs — dashboard is served from the same origin as the API
+        const API_BASE = '';
 
         let searchCount = 0;
         let addCount = 0;
         let searchTimeout = null;
 
-        // Check services status
+        // Check services status via /health endpoint
         async function checkStatus() {
             try {
-                const res = await fetch(`${API_BASE}/api/status`);
+                const res = await fetch(`${API_BASE}/health`);
                 const data = await res.json();
 
-                setStatus('rest', data.rest_api);
-                setStatus('mcp', data.mcp);
+                const isUp = data.status === 'ok' || data.status === 'degraded';
+                setStatus('rest', isUp);
+                setStatus('mcp', isUp);
                 setStatus('qdrant', data.qdrant);
                 setStatus('ollama', data.ollama);
             } catch {
@@ -1015,8 +1006,8 @@
         loadSkills();
 
         // Auto-refresh
-        setInterval(checkStatus, 30000);      // Status co 30s
-        setInterval(loadStats, 5000);         // Liczniki co 5s
+        setInterval(checkStatus, 30000);      // Status every 30s
+        setInterval(loadStats, 5000);         // Stats every 5s
 
         // Load only stats (fast endpoint)
         async function loadStats() {
