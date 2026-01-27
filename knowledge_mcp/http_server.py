@@ -184,21 +184,56 @@ async def api_skill_add(request):
     return JSONResponse({"success": True, "id": sid})
 
 
+async def api_projects(request):
+    """List or search projects."""
+    await _qdrant.ensure_collections()
+    query = request.query_params.get("q", "")
+    limit = min(int(request.query_params.get("limit", "50")), 200)
+
+    if query:
+        vector = await get_embeddings(query)
+        results = await _qdrant.search(settings.projects_collection, vector, limit=limit)
+        return JSONResponse({"results": results, "count": len(results)})
+
+    results, total = await _qdrant.list_all(settings.projects_collection, limit=limit)
+    return JSONResponse({"results": results, "count": total})
+
+
+async def api_private(request):
+    """List or search private notes."""
+    await _qdrant.ensure_collections()
+    query = request.query_params.get("q", "")
+    limit = min(int(request.query_params.get("limit", "50")), 200)
+
+    if query:
+        vector = await get_embeddings(query)
+        results = await _qdrant.search(settings.private_collection, vector, limit=limit)
+        return JSONResponse({"results": results, "count": len(results)})
+
+    results, total = await _qdrant.list_all(settings.private_collection, limit=limit)
+    return JSONResponse({"results": results, "count": total})
+
+
 async def api_stats(request):
     """Quick stats for the dashboard header."""
     await _qdrant.ensure_collections()
-    try:
-        k_count = (await _qdrant.client.count(settings.knowledge_collection)).count
-    except Exception:
-        k_count = 0
-    try:
-        s_count = (await _qdrant.client.count(settings.skills_collection)).count
-    except Exception:
-        s_count = 0
+    counts = {}
+    for name in [
+        settings.knowledge_collection,
+        settings.skills_collection,
+        settings.projects_collection,
+        settings.private_collection,
+    ]:
+        try:
+            counts[name] = (await _qdrant.client.count(name)).count
+        except Exception:
+            counts[name] = 0
     return JSONResponse(
         {
-            "knowledge_count": k_count,
-            "skills_count": s_count,
+            "knowledge_count": counts[settings.knowledge_collection],
+            "skills_count": counts[settings.skills_collection],
+            "projects_count": counts[settings.projects_collection],
+            "private_count": counts[settings.private_collection],
             "active_sessions": 0,
         }
     )
@@ -313,6 +348,8 @@ def main():
         Route("/api/knowledge", api_knowledge_add, methods=["POST"]),
         Route("/api/skills", api_skills, methods=["GET"]),
         Route("/api/skills", api_skill_add, methods=["POST"]),
+        Route("/api/projects", api_projects, methods=["GET"]),
+        Route("/api/private", api_private, methods=["GET"]),
         Route("/api/stats", api_stats, methods=["GET"]),
         Route("/api/graph", api_graph, methods=["GET"]),
         # Dashboard UI
