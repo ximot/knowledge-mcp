@@ -10,8 +10,12 @@ Thank you for your interest in contributing! This document provides guidelines f
    git clone https://github.com/<your-username>/knowledge-mcp.git
    cd knowledge-mcp
    ```
-3. Create a virtual environment and install dependencies:
+3. Install dependencies using [uv](https://docs.astral.sh/uv/) (recommended) or pip:
    ```bash
+   # With uv (recommended)
+   uv sync --extra dev
+
+   # With pip (alternative)
    python -m venv .venv
    source .venv/bin/activate
    pip install -r requirements.txt
@@ -23,11 +27,20 @@ Thank you for your interest in contributing! This document provides guidelines f
 ### Running locally
 
 ```bash
-# MCP server (stdio mode for Claude Code)
-python -m knowledge_mcp
+# With uv
+uv run python -m knowledge_mcp          # MCP server (stdio mode)
+uv run python knowledge_mcp/http_server.py  # HTTP server (remote access + dashboard)
 
-# HTTP server (remote access + dashboard)
+# With pip (if using venv)
+python -m knowledge_mcp
 python knowledge_mcp/http_server.py
+```
+
+### Linting and formatting
+
+```bash
+uv run ruff check --fix .
+uv run ruff format .
 ```
 
 ### Running with Docker

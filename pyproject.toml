@@ -1,6 +1,6 @@
 [build-system]
-requires = ["setuptools>=68.0", "wheel"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
 [project]
 name = "knowledge-mcp"
@@ -33,6 +33,9 @@ dependencies = [
     "aiofiles>=23.0.0",
 ]
 
+[project.optional-dependencies]
+dev = ["ruff", "mypy"]
+
 [project.urls]
 Homepage = "https://github.com/ximot/knowledge-mcp"
 Repository = "https://github.com/ximot/knowledge-mcp"
@@ -42,5 +45,5 @@ Issues = "https://github.com/ximot/knowledge-mcp/issues"
 knowledge-mcp = "knowledge_mcp.__main__:main"
 knowledge-mcp-http = "knowledge_mcp.http_server:main"
 
-[tool.setuptools.packages.find]
-include = ["knowledge_mcp*"]
+[tool.hatch.build.targets.wheel]
+packages = ["knowledge_mcp"]
