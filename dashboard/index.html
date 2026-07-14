@@ -767,6 +767,40 @@
             color: #888;
             font-size: 14px;
         }
+
+        /* MCP Playground */
+        .playground-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            align-items: start;
+        }
+
+        .playground-tool-desc {
+            font-size: 13px;
+            color: #888;
+            margin: -8px 0 15px;
+            line-height: 1.4;
+        }
+
+        .playground-result {
+            background: #0f0f0f;
+            border: 1px solid #2a2a2a;
+            border-radius: 8px;
+            padding: 15px;
+            max-height: 500px;
+            overflow: auto;
+            font-size: 13px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            word-break: break-word;
+            color: #ccc;
+        }
+
+        .playground-result.error {
+            color: #ef4444;
+            border-color: #ef4444;
+        }
     </style>
 </head>
 <body>
@@ -881,6 +915,7 @@
         <div class="view-tabs">
             <button class="view-tab active" onclick="switchView('list')">Knowledge & Skills</button>
             <button class="view-tab" onclick="switchView('graph')">Tag Graph</button>
+            <button class="view-tab" onclick="switchView('playground')">MCP Playground</button>
         </div>
 
         <!-- List View -->
@@ -972,6 +1007,36 @@
                     <div class="legend-item"><span class="legend-dot skill"></span> Skill</div>
                 </div>
                 <div class="graph-stats" id="graph-stats"></div>
+            </div>
+        </div>
+
+        <!-- MCP Playground -->
+        <div id="playground-view" class="view-content">
+            <div class="playground-grid">
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-title">Tool</span>
+                    </div>
+                    <select class="search-box" id="pg-tool-select" onchange="onPlaygroundToolChange()"></select>
+                    <p class="playground-tool-desc" id="pg-tool-desc"></p>
+                    <div id="pg-form"></div>
+                    <button class="btn btn-primary" onclick="executePlaygroundTool()">Execute</button>
+                </div>
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-title">Result</span>
+                    </div>
+                    <pre class="playground-result" id="pg-result">Select a tool and click Execute.</pre>
+                </div>
+            </div>
+            <div class="card" style="margin-top: 20px;">
+                <div class="card-header">
+                    <span class="card-title">Recent Calls</span>
+                    <button class="btn btn-small btn-secondary" onclick="clearPlaygroundHistory()">Clear</button>
+                </div>
+                <div class="list" id="pg-history">
+                    <div class="empty-state">No calls yet.</div>
+                </div>
             </div>
         </div>
     </div>
@@ -1716,6 +1781,12 @@
                 if (!graphLoaded) {
                     loadGraph();
                 }
+            } else if (view === 'playground') {
+                document.querySelectorAll('.view-tab')[2].classList.add('active');
+                document.getElementById('playground-view').classList.add('active');
+                if (!pgToolsLoaded) {
+                    loadPlaygroundTools();
+                }
             } else {
                 document.querySelectorAll('.view-tab')[0].classList.add('active');
                 document.getElementById('list-view').classList.add('active');
@@ -1955,6 +2026,257 @@
                 return `<b>${escapeHtml(node.title || node.label)}</b><br>Type: ${node.knowledge_type}<br>Tags: ${tags}`;
             }
             return `<b>${escapeHtml(node.label)}</b><br>${escapeHtml(node.description || '')}<br>Tags: ${tags}`;
+        }
+
+        // ========== MCP PLAYGROUND ==========
+        let pgTools = [];
+        let pgToolsLoaded = false;
+        let pgHistory = [];
+        try {
+            pgHistory = JSON.parse(localStorage.getItem('pg-history') || '[]');
+        } catch (e) {
+            pgHistory = [];
+        }
+
+        async function loadPlaygroundTools() {
+            const select = document.getElementById('pg-tool-select');
+            select.innerHTML = '<option>Loading tools...</option>';
+            try {
+                const res = await fetch(`${API_BASE}/api/mcp/tools`);
+                const data = await res.json();
+                pgTools = data.tools || [];
+                pgToolsLoaded = true;
+
+                const groups = {};
+                pgTools.forEach(t => {
+                    const prefix = t.name.split('_')[0];
+                    (groups[prefix] = groups[prefix] || []).push(t);
+                });
+
+                select.innerHTML = Object.entries(groups).map(([prefix, tools]) => `
+                    <optgroup label="${escapeHtml(prefix)}">
+                        ${tools.map(t => `<option value="${escapeHtml(t.name)}">${escapeHtml(t.name)}</option>`).join('')}
+                    </optgroup>
+                `).join('');
+
+                if (pgTools.length) onPlaygroundToolChange();
+                renderPlaygroundHistory();
+            } catch (e) {
+                select.innerHTML = '<option>Error loading tools</option>';
+            }
+        }
+
+        function pgResolveParamsSchema(tool) {
+            const schema = tool.inputSchema || {};
+            const ref = schema.properties && schema.properties.params && schema.properties.params.$ref;
+            if (!ref) return { properties: {}, required: [], defs: {} };
+            const defName = ref.split('/').pop();
+            const defs = schema.$defs || {};
+            return { ...(defs[defName] || {}), defs };
+        }
+
+        function pgResolveEnum(fieldSchema, defs) {
+            let ref = fieldSchema.$ref;
+            if (!ref && fieldSchema.anyOf) {
+                const withRef = fieldSchema.anyOf.find(s => s.$ref);
+                if (withRef) ref = withRef.$ref;
+            }
+            if (!ref) return null;
+            const def = defs[ref.split('/').pop()];
+            return def && def.enum ? def : null;
+        }
+
+        function pgFieldMatches(fieldSchema, type) {
+            if (fieldSchema.type === type) return true;
+            return (fieldSchema.anyOf || []).some(s => s.type === type);
+        }
+
+        function onPlaygroundToolChange() {
+            const name = document.getElementById('pg-tool-select').value;
+            const tool = pgTools.find(t => t.name === name);
+            const formEl = document.getElementById('pg-form');
+            if (!tool) {
+                document.getElementById('pg-tool-desc').textContent = '';
+                formEl.innerHTML = '';
+                return;
+            }
+
+            document.getElementById('pg-tool-desc').textContent = (tool.description || '').split('\n')[0];
+
+            const schema = pgResolveParamsSchema(tool);
+            const required = new Set(schema.required || []);
+            const props = schema.properties || {};
+            const defs = schema.defs || {};
+
+            const fields = Object.entries(props).map(([key, fieldSchema]) => {
+                const label = `${key}${required.has(key) ? ' *' : ''}`;
+                const enumDef = pgResolveEnum(fieldSchema, defs);
+                const fieldId = `pg-field-${key}`;
+
+                if (enumDef) {
+                    const options = enumDef.enum.map(v => `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('');
+                    return `
+                        <div class="form-group">
+                            <label class="form-label">${escapeHtml(label)}</label>
+                            <select class="form-select" id="${fieldId}" data-field="${escapeHtml(key)}">
+                                <option value="">(default)</option>
+                                ${options}
+                            </select>
+                        </div>
+                    `;
+                }
+                if (pgFieldMatches(fieldSchema, 'array')) {
+                    return `
+                        <div class="form-group">
+                            <label class="form-label">${escapeHtml(label)} (comma-separated)</label>
+                            <input type="text" class="form-input" id="${fieldId}" data-field="${escapeHtml(key)}" data-kind="array">
+                        </div>
+                    `;
+                }
+                if (pgFieldMatches(fieldSchema, 'object')) {
+                    return `
+                        <div class="form-group">
+                            <label class="form-label">${escapeHtml(label)} (JSON)</label>
+                            <textarea class="form-textarea" id="${fieldId}" data-field="${escapeHtml(key)}" data-kind="object" placeholder="{}"></textarea>
+                        </div>
+                    `;
+                }
+                if (pgFieldMatches(fieldSchema, 'integer') || pgFieldMatches(fieldSchema, 'number')) {
+                    const def = fieldSchema.default;
+                    return `
+                        <div class="form-group">
+                            <label class="form-label">${escapeHtml(label)}</label>
+                            <input type="number" class="form-input" id="${fieldId}" data-field="${escapeHtml(key)}" data-kind="number" value="${def != null ? escapeHtml(String(def)) : ''}">
+                        </div>
+                    `;
+                }
+                if ((fieldSchema.maxLength || 0) > 200) {
+                    return `
+                        <div class="form-group">
+                            <label class="form-label">${escapeHtml(label)}</label>
+                            <textarea class="form-textarea" id="${fieldId}" data-field="${escapeHtml(key)}"></textarea>
+                        </div>
+                    `;
+                }
+                return `
+                    <div class="form-group">
+                        <label class="form-label">${escapeHtml(label)}</label>
+                        <input type="text" class="form-input" id="${fieldId}" data-field="${escapeHtml(key)}">
+                    </div>
+                `;
+            }).join('');
+
+            formEl.innerHTML = fields || '<p style="color:#666">No parameters.</p>';
+        }
+
+        function pgReadParams() {
+            const inputs = document.querySelectorAll('#pg-form [data-field]');
+            const params = {};
+            inputs.forEach(el => {
+                const key = el.dataset.field;
+                const kind = el.dataset.kind;
+                const raw = el.value;
+                if (raw === '') return;
+
+                if (kind === 'array') {
+                    params[key] = raw.split(',').map(s => s.trim()).filter(Boolean);
+                } else if (kind === 'object') {
+                    try {
+                        params[key] = JSON.parse(raw);
+                    } catch (e) {
+                        throw new Error(`Invalid JSON in field "${key}"`);
+                    }
+                } else if (kind === 'number') {
+                    params[key] = Number(raw);
+                } else {
+                    params[key] = raw;
+                }
+            });
+            return params;
+        }
+
+        async function executePlaygroundTool() {
+            const toolName = document.getElementById('pg-tool-select').value;
+            const resultEl = document.getElementById('pg-result');
+            let params;
+            try {
+                params = pgReadParams();
+            } catch (err) {
+                resultEl.textContent = `Error: ${err.message}`;
+                resultEl.classList.add('error');
+                return;
+            }
+
+            resultEl.textContent = 'Running...';
+            resultEl.classList.remove('error');
+
+            let data;
+            try {
+                const res = await fetch(`${API_BASE}/api/mcp/call`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: toolName, params }),
+                });
+                data = await res.json();
+            } catch (err) {
+                data = { success: false, error: err.message };
+            }
+
+            resultEl.textContent = data.success ? data.result : `Error: ${data.error}`;
+            resultEl.classList.toggle('error', !data.success);
+
+            pgHistory.unshift({
+                toolName,
+                params,
+                success: !!data.success,
+                result: data.success ? data.result : data.error,
+                ts: new Date().toISOString(),
+            });
+            pgHistory = pgHistory.slice(0, 20);
+            try {
+                localStorage.setItem('pg-history', JSON.stringify(pgHistory));
+            } catch (e) { /* localStorage unavailable — history stays in-memory only */ }
+            renderPlaygroundHistory();
+        }
+
+        function renderPlaygroundHistory() {
+            const container = document.getElementById('pg-history');
+            if (!pgHistory.length) {
+                container.innerHTML = '<div class="empty-state">No calls yet.</div>';
+                return;
+            }
+            container.innerHTML = pgHistory.map((h, i) => `
+                <div class="list-item" onclick="replayPlaygroundHistory(${i})">
+                    <div class="list-item-title">${h.success ? '' : '⚠️ '}${escapeHtml(h.toolName)}</div>
+                    <div class="list-item-meta">${new Date(h.ts).toLocaleTimeString()} — ${escapeHtml(JSON.stringify(h.params))}</div>
+                </div>
+            `).join('');
+        }
+
+        function replayPlaygroundHistory(index) {
+            const h = pgHistory[index];
+            if (!h || !pgToolsLoaded) return;
+
+            document.getElementById('pg-tool-select').value = h.toolName;
+            onPlaygroundToolChange();
+
+            Object.entries(h.params).forEach(([key, value]) => {
+                const el = document.querySelector(`#pg-form [data-field="${CSS.escape(key)}"]`);
+                if (!el) return;
+                if (Array.isArray(value)) {
+                    el.value = value.join(', ');
+                } else if (typeof value === 'object' && value !== null) {
+                    el.value = JSON.stringify(value);
+                } else {
+                    el.value = value;
+                }
+            });
+        }
+
+        function clearPlaygroundHistory() {
+            pgHistory = [];
+            localStorage.removeItem('pg-history');
+            renderPlaygroundHistory();
         }
     </script>
 </body>

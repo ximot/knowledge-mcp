@@ -300,6 +300,33 @@ async def api_private_add(request):
     return JSONResponse({"success": True, "id": priv_id})
 
 
+# ---------------------------------------------------------------------------
+# MCP playground (used by the dashboard's tool tester)
+# ---------------------------------------------------------------------------
+
+
+async def api_mcp_tools(request):
+    """List all registered MCP tools with their JSON-schema input shape."""
+    tools = await mcp.list_tools()
+    return JSONResponse({"tools": [t.model_dump(mode="json") for t in tools]})
+
+
+async def api_mcp_call(request):
+    """Invoke an MCP tool by name with the given params, for the playground."""
+    body = await request.json()
+    name = body.get("name")
+    params = body.get("params", {})
+    if not name:
+        return JSONResponse({"success": False, "error": "name is required"}, status_code=400)
+
+    try:
+        content, _structured = await mcp.call_tool(name, {"params": params})
+        text = "\n".join(getattr(block, "text", "") for block in content)
+        return JSONResponse({"success": True, "result": text})
+    except Exception as e:
+        return JSONResponse({"success": False, "error": str(e)})
+
+
 async def api_stats(request):
     """Quick stats for the dashboard header."""
     await _qdrant.ensure_collections()
@@ -445,6 +472,9 @@ def main():
         Route("/api/private", api_private_add, methods=["POST"]),
         Route("/api/stats", api_stats, methods=["GET"]),
         Route("/api/graph", api_graph, methods=["GET"]),
+        # MCP playground
+        Route("/api/mcp/tools", api_mcp_tools, methods=["GET"]),
+        Route("/api/mcp/call", api_mcp_call, methods=["POST"]),
         # Dashboard UI
         Route("/dashboard", dashboard_index, methods=["GET"]),
         Route("/dashboard/", dashboard_index, methods=["GET"]),
