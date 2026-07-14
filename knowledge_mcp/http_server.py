@@ -13,9 +13,13 @@ Or with uv:
 """
 
 import hashlib
+import io
+import json
 import os
+import re
 import sys
 import time
+import zipfile
 from datetime import datetime
 from pathlib import Path
 
@@ -25,8 +29,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import httpx
 import uvicorn
 from starlette.applications import Starlette
+from starlette.datastructures import UploadFile
 from starlette.routing import Route, Mount
-from starlette.responses import JSONResponse, HTMLResponse, FileResponse
+from starlette.responses import JSONResponse, HTMLResponse, FileResponse, Response
 from knowledge_mcp import __version__
 from knowledge_mcp.server import mcp
 from knowledge_mcp.config import settings
@@ -300,6 +305,168 @@ async def api_private_add(request):
     return JSONResponse({"success": True, "id": priv_id})
 
 
+_EXPORT_COLLECTIONS = {
+    "knowledge": settings.knowledge_collection,
+    "skills": settings.skills_collection,
+    "projects": settings.projects_collection,
+    "private": settings.private_collection,
+}
+
+
+# ---------------------------------------------------------------------------
+# Import / export (used by the dashboard's Import/Export controls)
+# ---------------------------------------------------------------------------
+
+
+async def api_export_json(request):
+    """Export every entry of a collection as a downloadable JSON file."""
+    name = request.path_params["collection"]
+    collection = _EXPORT_COLLECTIONS.get(name)
+    if collection is None:
+        return JSONResponse({"success": False, "error": "unknown collection"}, status_code=404)
+
+    await _qdrant.ensure_collections()
+    results, _ = await _qdrant.list_all(collection, limit=10000)
+    return Response(
+        content=json.dumps(results, indent=2, default=str),
+        media_type="application/json",
+        headers={"Content-Disposition": f'attachment; filename="{name}-export.json"'},
+    )
+
+
+def _skill_to_md(skill: dict) -> str:
+    """Render a skill payload back into SKILL.md frontmatter + prompt format."""
+    tags = ", ".join(skill.get("tags") or [])
+    frontmatter = (
+        "---\n"
+        f"name: {skill.get('name', '')}\n"
+        f"description: {skill.get('description', '')}\n"
+        f"tags: [{tags}]\n"
+        "---\n\n"
+    )
+    return frontmatter + (skill.get("prompt") or "")
+
+
+async def api_skills_export_md(request):
+    """Export all skills as a .zip of individual <name>/SKILL.md files."""
+    await _qdrant.ensure_collections()
+    results, _ = await _qdrant.list_all(settings.skills_collection, limit=10000)
+
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+        for skill in results:
+            name = skill.get("name") or skill.get("id", "unnamed")
+            zf.writestr(f"{name}/SKILL.md", _skill_to_md(skill))
+
+    return Response(
+        content=buffer.getvalue(),
+        media_type="application/zip",
+        headers={"Content-Disposition": 'attachment; filename="skills-export.zip"'},
+    )
+
+
+def _parse_skill_md(content: str, filename: str) -> dict:
+    """Parse a SKILL.md file's frontmatter + body, mirroring scripts/import_skills.py."""
+    name = None
+    description = None
+    tags: list[str] = []
+
+    frontmatter_match = re.match(r"^---\s*\n(.*?)\n---\s*\n", content, re.DOTALL)
+    if frontmatter_match:
+        frontmatter = frontmatter_match.group(1)
+        content = content[frontmatter_match.end() :]
+
+        for line in frontmatter.split("\n"):
+            if ":" in line:
+                key, value = line.split(":", 1)
+                key = key.strip()
+                value = value.strip().strip("\"'")
+
+                if key == "name":
+                    name = value
+                elif key == "description":
+                    description = value
+                elif key == "tags":
+                    tags = [t.strip().strip("\"'") for t in value.strip("[]").split(",")]
+
+    if not name:
+        name = Path(filename).stem.lower().replace("_", "-").replace(" ", "-")
+        if name == "skill":
+            name = Path(filename).parent.name.lower().replace("_", "-").replace(" ", "-")
+
+    if not description:
+        for line in content.strip().split("\n"):
+            line = line.strip()
+            if line and not line.startswith("#"):
+                description = line[:200]
+                break
+        if not description:
+            description = f"Skill imported from {filename}"
+
+    return {
+        "name": name,
+        "description": description,
+        "prompt": content.strip(),
+        "tags": [t for t in tags if t],
+    }
+
+
+async def api_skills_import(request):
+    """Import one or more uploaded SKILL.md files."""
+    form = await request.form()
+    uploads = [v for _, v in form.multi_items() if isinstance(v, UploadFile)]
+    if not uploads:
+        return JSONResponse({"success": False, "error": "no files uploaded"}, status_code=400)
+
+    await _qdrant.ensure_collections()
+
+    results = []
+    for upload in uploads:
+        filename = upload.filename or "SKILL.md"
+        try:
+            raw = await upload.read()
+            skill_data = _parse_skill_md(raw.decode("utf-8"), filename)
+
+            existing = await _qdrant.get_by_field("skills", "name", skill_data["name"])
+            if existing:
+                results.append(
+                    {"filename": filename, "name": skill_data["name"], "status": "skipped"}
+                )
+                continue
+
+            skill_id = f"s-{skill_data['name']}"
+            now = datetime.utcnow().isoformat()
+            payload = {
+                "id": skill_id,
+                **skill_data,
+                "version": "1.0.0",
+                "examples": [],
+                "created_at": now,
+                "updated_at": now,
+            }
+            text_for_embedding = (
+                f"{skill_data['name']} {skill_data['description']} {skill_data['prompt']}"
+            )
+            vector = await get_embeddings(text_for_embedding)
+            await _qdrant.upsert(settings.skills_collection, skill_id, vector, payload)
+            results.append({"filename": filename, "name": skill_data["name"], "status": "imported"})
+        except Exception as e:
+            results.append({"filename": filename, "status": "error", "error": str(e)})
+
+    imported = sum(1 for r in results if r["status"] == "imported")
+    skipped = sum(1 for r in results if r["status"] == "skipped")
+    errors = sum(1 for r in results if r["status"] == "error")
+    return JSONResponse(
+        {
+            "success": True,
+            "results": results,
+            "imported": imported,
+            "skipped": skipped,
+            "errors": errors,
+        }
+    )
+
+
 async def api_stats(request):
     """Quick stats for the dashboard header."""
     await _qdrant.ensure_collections()
@@ -445,6 +612,10 @@ def main():
         Route("/api/private", api_private_add, methods=["POST"]),
         Route("/api/stats", api_stats, methods=["GET"]),
         Route("/api/graph", api_graph, methods=["GET"]),
+        # Import / export
+        Route("/api/export/{collection}", api_export_json, methods=["GET"]),
+        Route("/api/skills/export.zip", api_skills_export_md, methods=["GET"]),
+        Route("/api/skills/import", api_skills_import, methods=["POST"]),
         # Dashboard UI
         Route("/dashboard", dashboard_index, methods=["GET"]),
         Route("/dashboard/", dashboard_index, methods=["GET"]),
