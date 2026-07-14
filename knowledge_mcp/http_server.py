@@ -122,18 +122,30 @@ async def health_check(request):
 # ---------------------------------------------------------------------------
 
 
+def _parse_tags(request) -> list[str]:
+    """Parse a comma-separated ?tags= query param into a list (AND filter)."""
+    raw = request.query_params.get("tags", "")
+    return [t.strip() for t in raw.split(",") if t.strip()]
+
+
 async def api_knowledge(request):
-    """List or search knowledge entries."""
+    """List or search knowledge entries, optionally filtered by tags (AND)."""
     await _qdrant.ensure_collections()
     query = request.query_params.get("q", "")
     limit = min(int(request.query_params.get("limit", "50")), 200)
+    tags = _parse_tags(request)
+    filters = {"tags": tags} if tags else None
 
     if query:
         vector = await get_embeddings(query)
-        results = await _qdrant.search(settings.knowledge_collection, vector, limit=limit)
+        results = await _qdrant.search(
+            settings.knowledge_collection, vector, limit=limit, filters=filters
+        )
         return JSONResponse({"results": results, "count": len(results)})
 
-    results, total = await _qdrant.list_all(settings.knowledge_collection, limit=limit)
+    results, total = await _qdrant.list_all(
+        settings.knowledge_collection, limit=limit, filters=filters
+    )
     return JSONResponse({"results": results, "count": total})
 
 
@@ -167,17 +179,23 @@ async def api_knowledge_add(request):
 
 
 async def api_skills(request):
-    """List or search skills."""
+    """List or search skills, optionally filtered by tags (AND)."""
     await _qdrant.ensure_collections()
     query = request.query_params.get("q", "")
     limit = min(int(request.query_params.get("limit", "50")), 200)
+    tags = _parse_tags(request)
+    filters = {"tags": tags} if tags else None
 
     if query:
         vector = await get_embeddings(query)
-        results = await _qdrant.search(settings.skills_collection, vector, limit=limit)
+        results = await _qdrant.search(
+            settings.skills_collection, vector, limit=limit, filters=filters
+        )
         return JSONResponse({"results": results, "count": len(results)})
 
-    results, total = await _qdrant.list_all(settings.skills_collection, limit=limit)
+    results, total = await _qdrant.list_all(
+        settings.skills_collection, limit=limit, filters=filters
+    )
     return JSONResponse({"results": results, "count": total})
 
 
@@ -212,17 +230,23 @@ async def api_skill_add(request):
 
 
 async def api_projects(request):
-    """List or search projects."""
+    """List or search projects, optionally filtered by tags (AND)."""
     await _qdrant.ensure_collections()
     query = request.query_params.get("q", "")
     limit = min(int(request.query_params.get("limit", "50")), 200)
+    tags = _parse_tags(request)
+    filters = {"tags": tags} if tags else None
 
     if query:
         vector = await get_embeddings(query)
-        results = await _qdrant.search(settings.projects_collection, vector, limit=limit)
+        results = await _qdrant.search(
+            settings.projects_collection, vector, limit=limit, filters=filters
+        )
         return JSONResponse({"results": results, "count": len(results)})
 
-    results, total = await _qdrant.list_all(settings.projects_collection, limit=limit)
+    results, total = await _qdrant.list_all(
+        settings.projects_collection, limit=limit, filters=filters
+    )
     return JSONResponse({"results": results, "count": total})
 
 
@@ -257,17 +281,23 @@ async def api_project_add(request):
 
 
 async def api_private(request):
-    """List or search private entries."""
+    """List or search private entries, optionally filtered by tags (AND)."""
     await _qdrant.ensure_collections()
     query = request.query_params.get("q", "")
     limit = min(int(request.query_params.get("limit", "50")), 200)
+    tags = _parse_tags(request)
+    filters = {"tags": tags} if tags else None
 
     if query:
         vector = await get_embeddings(query)
-        results = await _qdrant.search(settings.private_collection, vector, limit=limit)
+        results = await _qdrant.search(
+            settings.private_collection, vector, limit=limit, filters=filters
+        )
         return JSONResponse({"results": results, "count": len(results)})
 
-    results, total = await _qdrant.list_all(settings.private_collection, limit=limit)
+    results, total = await _qdrant.list_all(
+        settings.private_collection, limit=limit, filters=filters
+    )
     return JSONResponse({"results": results, "count": total})
 
 
@@ -386,6 +416,22 @@ async def api_graph(request):
 
     for (a, b), tags in edge_map.items():
         edges.append({"from": a, "to": b, "tags": tags})
+
+    # Tag hub nodes, one per tag, connected to every item carrying that tag —
+    # lets the dashboard offer "click a tag to filter" on the graph view.
+    for tag, count in tag_stats.items():
+        nodes.append(
+            {
+                "id": f"tag:{tag}",
+                "label": f"#{tag}",
+                "type": "tag",
+                "tag": tag,
+                "count": count,
+            }
+        )
+    for tag, node_ids in tag_to_node_ids.items():
+        for node_id in node_ids:
+            edges.append({"from": f"tag:{tag}", "to": node_id, "tags": [tag], "isTagEdge": True})
 
     return JSONResponse(
         {
