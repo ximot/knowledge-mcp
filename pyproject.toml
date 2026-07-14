@@ -34,7 +34,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["ruff", "mypy"]
+dev = ["ruff", "mypy", "pytest>=8.0.0", "pytest-asyncio>=0.24.0"]
 
 [project.urls]
 Homepage = "https://github.com/ximot/knowledge-mcp"
@@ -47,3 +47,7 @@ knowledge-mcp-http = "knowledge_mcp.http_server:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["knowledge_mcp"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
