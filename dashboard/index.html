@@ -767,6 +767,68 @@
             color: #888;
             font-size: 14px;
         }
+
+        /* Import Skills */
+        .import-dropzone {
+            border: 2px dashed #2a2a2a;
+            border-radius: 12px;
+            padding: 40px 20px;
+            text-align: center;
+            color: #888;
+            cursor: pointer;
+            transition: border-color 0.2s, background 0.2s;
+        }
+
+        .import-dropzone:hover,
+        .import-dropzone.dragover {
+            border-color: #3b82f6;
+            background: #3b82f611;
+            color: #e0e0e0;
+        }
+
+        .import-progress {
+            margin-top: 15px;
+        }
+
+        .import-progress-bar {
+            width: 100%;
+            height: 6px;
+            background: #0f0f0f;
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .import-progress-fill {
+            height: 100%;
+            width: 0%;
+            background: #3b82f6;
+            transition: width 0.2s;
+        }
+
+        #import-progress-label {
+            margin-top: 8px;
+            font-size: 12px;
+            color: #888;
+        }
+
+        .import-results {
+            margin-top: 15px;
+            max-height: 250px;
+            overflow-y: auto;
+        }
+
+        .import-result-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 13px;
+            margin-bottom: 4px;
+        }
+
+        .import-result-row.imported { background: #22c55e22; color: #22c55e; }
+        .import-result-row.skipped { background: #f59e0b22; color: #f59e0b; }
+        .import-result-row.error { background: #ef444422; color: #ef4444; }
     </style>
 </head>
 <body>
@@ -900,6 +962,7 @@
                 <span class="card-title">Knowledge Base</span>
                 <div>
                     <button class="btn btn-small btn-primary" onclick="showAddForm('knowledge')">+ Add</button>
+                    <button class="btn btn-small btn-secondary" onclick="exportCollectionJson('knowledge')">Export JSON</button>
                     <button class="refresh-btn" onclick="loadKnowledge()">Refresh</button>
                 </div>
             </div>
@@ -915,6 +978,9 @@
                 <span class="card-title">Skills</span>
                 <div>
                     <button class="btn btn-small btn-primary" onclick="showAddForm('skill')">+ Add</button>
+                    <button class="btn btn-small btn-secondary" onclick="showImportSkillsModal()">Import</button>
+                    <button class="btn btn-small btn-secondary" onclick="exportCollectionJson('skills')">Export JSON</button>
+                    <button class="btn btn-small btn-secondary" onclick="exportSkillsMd()">Export .md</button>
                     <button class="refresh-btn" onclick="loadSkills()">Refresh</button>
                 </div>
             </div>
@@ -930,6 +996,7 @@
                 <span class="card-title">Projects</span>
                 <div>
                     <button class="btn btn-small btn-primary" onclick="showAddForm('project')">+ Add</button>
+                    <button class="btn btn-small btn-secondary" onclick="exportCollectionJson('projects')">Export JSON</button>
                     <button class="refresh-btn" onclick="loadProjects()">Refresh</button>
                 </div>
             </div>
@@ -945,6 +1012,7 @@
                 <span class="card-title">Private Notes</span>
                 <div>
                     <button class="btn btn-small btn-primary" onclick="showAddForm('private')">+ Add</button>
+                    <button class="btn btn-small btn-secondary" onclick="exportCollectionJson('private')">Export JSON</button>
                     <button class="refresh-btn" onclick="loadPrivate()">Refresh</button>
                 </div>
             </div>
@@ -1128,6 +1196,25 @@
                 </div>
                 <button type="submit" class="btn btn-primary">Add Private Note</button>
             </form>
+        </div>
+    </div>
+
+    <!-- Import Skills Modal -->
+    <div class="modal" id="import-skills-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Import SKILL.md Files</h2>
+                <button class="modal-close" onclick="closeImportSkillsModal()">&times;</button>
+            </div>
+            <div class="import-dropzone" id="import-dropzone" onclick="document.getElementById('import-skills-input').click()">
+                <p>Drag &amp; drop SKILL.md files here, or click to browse</p>
+                <input type="file" id="import-skills-input" accept=".md" multiple style="display:none">
+            </div>
+            <div class="import-progress" id="import-progress" style="display:none">
+                <div class="import-progress-bar"><div class="import-progress-fill" id="import-progress-fill"></div></div>
+                <div id="import-progress-label"></div>
+            </div>
+            <div class="import-results" id="import-results"></div>
         </div>
     </div>
 
@@ -1640,6 +1727,132 @@
             notif.classList.add('show');
             setTimeout(() => notif.classList.remove('show'), 3000);
         }
+
+        // ========== IMPORT / EXPORT ==========
+
+        function triggerDownload(blob, filename) {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+        }
+
+        async function exportCollectionJson(type) {
+            try {
+                const res = await fetch(`${API_BASE}/api/export/${type}`);
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const blob = await res.blob();
+                triggerDownload(blob, `${type}-export.json`);
+                showNotification(`Exported ${type} as JSON`);
+            } catch (err) {
+                showNotification(`Error exporting ${type}`, true);
+            }
+        }
+
+        async function exportSkillsMd() {
+            try {
+                const res = await fetch(`${API_BASE}/api/skills/export.zip`);
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const blob = await res.blob();
+                triggerDownload(blob, 'skills-export.zip');
+                showNotification('Exported skills as SKILL.md (zip)');
+            } catch (err) {
+                showNotification('Error exporting skills', true);
+            }
+        }
+
+        function showImportSkillsModal() {
+            document.getElementById('import-progress').style.display = 'none';
+            document.getElementById('import-results').innerHTML = '';
+            document.getElementById('import-skills-modal').classList.add('active');
+        }
+
+        function closeImportSkillsModal() {
+            document.getElementById('import-skills-modal').classList.remove('active');
+        }
+
+        async function importSkillFiles(fileList) {
+            const files = Array.from(fileList).filter(f => f.name.toLowerCase().endsWith('.md'));
+            if (!files.length) {
+                showNotification('No .md files selected', true);
+                return;
+            }
+
+            const progress = document.getElementById('import-progress');
+            const fill = document.getElementById('import-progress-fill');
+            const label = document.getElementById('import-progress-label');
+            const results = document.getElementById('import-results');
+            progress.style.display = 'block';
+            fill.style.width = '10%';
+            label.textContent = `Uploading ${files.length} file(s)...`;
+            results.innerHTML = '';
+
+            const formData = new FormData();
+            files.forEach(f => formData.append('files', f, f.name));
+
+            try {
+                const res = await fetch(`${API_BASE}/api/skills/import`, {
+                    method: 'POST',
+                    body: formData,
+                });
+                const data = await res.json();
+                fill.style.width = '100%';
+
+                if (!res.ok || !data.success) {
+                    label.textContent = 'Import failed';
+                    showNotification(data.error || 'Import failed', true);
+                    return;
+                }
+
+                label.textContent = `Imported ${data.imported}, skipped ${data.skipped}, errors ${data.errors}`;
+                results.innerHTML = (data.results || []).map(r => `
+                    <div class="import-result-row ${r.status}">
+                        <span>${escapeHtml(r.filename)}</span>
+                        <span>${r.status}${r.error ? ': ' + escapeHtml(r.error) : ''}</span>
+                    </div>
+                `).join('');
+
+                showNotification(`Imported ${data.imported} skill(s)`);
+                loadSkills();
+            } catch (err) {
+                label.textContent = 'Import failed';
+                showNotification('Error importing skills', true);
+            }
+        }
+
+        (function setupImportDropzone() {
+            const dropzone = document.getElementById('import-dropzone');
+            const input = document.getElementById('import-skills-input');
+            if (!dropzone || !input) return;
+
+            input.addEventListener('change', () => {
+                if (input.files.length) importSkillFiles(input.files);
+                input.value = '';
+            });
+
+            ['dragenter', 'dragover'].forEach(evt => {
+                dropzone.addEventListener(evt, e => {
+                    e.preventDefault();
+                    dropzone.classList.add('dragover');
+                });
+            });
+
+            ['dragleave', 'drop'].forEach(evt => {
+                dropzone.addEventListener(evt, e => {
+                    e.preventDefault();
+                    dropzone.classList.remove('dragover');
+                });
+            });
+
+            dropzone.addEventListener('drop', e => {
+                const files = e.dataTransfer && e.dataTransfer.files;
+                if (files && files.length) importSkillFiles(files);
+            });
+        })();
 
         // Simple markdown to HTML
         function markdownToHtml(md) {
