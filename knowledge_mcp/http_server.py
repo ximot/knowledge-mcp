@@ -166,6 +166,30 @@ async def api_knowledge_add(request):
     return JSONResponse({"success": True, "id": kid})
 
 
+async def api_knowledge_update(request):
+    """Update a knowledge entry via PUT."""
+    entry_id = request.path_params["id"]
+    existing = await _qdrant.get_by_id(settings.knowledge_collection, entry_id)
+    if not existing:
+        return JSONResponse({"success": False, "error": "not found"}, status_code=404)
+
+    body = await request.json()
+    title = body.get("title", existing.get("title", "")).strip()
+    content = body.get("content", existing.get("content", ""))
+    payload = {
+        **existing,
+        "title": title,
+        "content": content,
+        "knowledge_type": body.get("knowledge_type", existing.get("knowledge_type", "note")),
+        "tags": body.get("tags", existing.get("tags", [])),
+        "source": body.get("source", existing.get("source")),
+        "updated_at": datetime.utcnow().isoformat(),
+    }
+    vector = await get_embeddings(f"{title} {content}")
+    await _qdrant.upsert(settings.knowledge_collection, entry_id, vector, payload)
+    return JSONResponse({"success": True, "id": entry_id})
+
+
 async def api_skills(request):
     """List or search skills."""
     await _qdrant.ensure_collections()
@@ -209,6 +233,30 @@ async def api_skill_add(request):
     await _qdrant.ensure_collections()
     await _qdrant.upsert(settings.skills_collection, sid, vector, payload)
     return JSONResponse({"success": True, "id": sid})
+
+
+async def api_skill_update(request):
+    """Update a skill via PUT."""
+    entry_id = request.path_params["id"]
+    existing = await _qdrant.get_by_id(settings.skills_collection, entry_id)
+    if not existing:
+        return JSONResponse({"success": False, "error": "not found"}, status_code=404)
+
+    body = await request.json()
+    name = existing.get("name", "")
+    description = body.get("description", existing.get("description", ""))
+    prompt = body.get("prompt", existing.get("prompt", ""))
+    payload = {
+        **existing,
+        "description": description,
+        "prompt": prompt,
+        "tags": body.get("tags", existing.get("tags", [])),
+        "version": body.get("version", existing.get("version", "1.0.0")),
+        "updated_at": datetime.utcnow().isoformat(),
+    }
+    vector = await get_embeddings(f"{name} {description} {prompt}")
+    await _qdrant.upsert(settings.skills_collection, entry_id, vector, payload)
+    return JSONResponse({"success": True, "id": entry_id})
 
 
 async def api_projects(request):
@@ -256,6 +304,29 @@ async def api_project_add(request):
     return JSONResponse({"success": True, "id": pid})
 
 
+async def api_project_update(request):
+    """Update a project via PUT."""
+    entry_id = request.path_params["id"]
+    existing = await _qdrant.get_by_id(settings.projects_collection, entry_id)
+    if not existing:
+        return JSONResponse({"success": False, "error": "not found"}, status_code=404)
+
+    body = await request.json()
+    name = existing.get("name", "")
+    description = body.get("description", existing.get("description", ""))
+    payload = {
+        **existing,
+        "path": body.get("path", existing.get("path", "")),
+        "description": description,
+        "status": body.get("status", existing.get("status", "active")),
+        "tags": body.get("tags", existing.get("tags", [])),
+        "updated_at": datetime.utcnow().isoformat(),
+    }
+    vector = await get_embeddings(f"{name} {description}")
+    await _qdrant.upsert(settings.projects_collection, entry_id, vector, payload)
+    return JSONResponse({"success": True, "id": entry_id})
+
+
 async def api_private(request):
     """List or search private entries."""
     await _qdrant.ensure_collections()
@@ -298,6 +369,29 @@ async def api_private_add(request):
     await _qdrant.ensure_collections()
     await _qdrant.upsert(settings.private_collection, priv_id, vector, payload)
     return JSONResponse({"success": True, "id": priv_id})
+
+
+async def api_private_update(request):
+    """Update a private entry via PUT."""
+    entry_id = request.path_params["id"]
+    existing = await _qdrant.get_by_id(settings.private_collection, entry_id)
+    if not existing:
+        return JSONResponse({"success": False, "error": "not found"}, status_code=404)
+
+    body = await request.json()
+    title = body.get("title", existing.get("title", "")).strip()
+    content = body.get("content", existing.get("content", ""))
+    payload = {
+        **existing,
+        "title": title,
+        "content": content,
+        "private_type": body.get("private_type", existing.get("private_type", "note")),
+        "tags": body.get("tags", existing.get("tags", [])),
+        "updated_at": datetime.utcnow().isoformat(),
+    }
+    vector = await get_embeddings(f"{title} {content}")
+    await _qdrant.upsert(settings.private_collection, entry_id, vector, payload)
+    return JSONResponse({"success": True, "id": entry_id})
 
 
 async def api_stats(request):
@@ -437,12 +531,16 @@ def main():
         # Dashboard REST API
         Route("/api/knowledge", api_knowledge, methods=["GET"]),
         Route("/api/knowledge", api_knowledge_add, methods=["POST"]),
+        Route("/api/knowledge/{id}", api_knowledge_update, methods=["PUT"]),
         Route("/api/skills", api_skills, methods=["GET"]),
         Route("/api/skills", api_skill_add, methods=["POST"]),
+        Route("/api/skills/{id}", api_skill_update, methods=["PUT"]),
         Route("/api/projects", api_projects, methods=["GET"]),
         Route("/api/projects", api_project_add, methods=["POST"]),
+        Route("/api/projects/{id}", api_project_update, methods=["PUT"]),
         Route("/api/private", api_private, methods=["GET"]),
         Route("/api/private", api_private_add, methods=["POST"]),
+        Route("/api/private/{id}", api_private_update, methods=["PUT"]),
         Route("/api/stats", api_stats, methods=["GET"]),
         Route("/api/graph", api_graph, methods=["GET"]),
         # Dashboard UI
