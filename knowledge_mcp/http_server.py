@@ -693,7 +693,7 @@ def main():
         Mount("/", mcp_app),
     ]
 
-    app = Starlette(routes=routes)
+    app = Starlette(routes=routes, lifespan=mcp_app.router.lifespan_context)
 
     uvicorn.run(app, host=host, port=port)
 
