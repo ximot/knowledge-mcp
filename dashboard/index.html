@@ -378,6 +378,16 @@
             cursor: pointer;
         }
 
+        .modal-edit {
+            background: none;
+            border: 1px solid #3b82f6;
+            color: #3b82f6;
+            border-radius: 6px;
+            padding: 5px 12px;
+            font-size: 13px;
+            cursor: pointer;
+        }
+
         .modal-delete {
             background: none;
             border: 1px solid #a33;
@@ -388,6 +398,11 @@
             cursor: pointer;
         }
 
+        .modal-edit:hover {
+            background: #3b82f6;
+            color: #fff;
+        }
+
         .modal-delete:hover {
             background: #a33;
             color: #fff;
@@ -396,6 +411,70 @@
         .modal-body {
             color: #ccc;
             line-height: 1.6;
+        }
+
+        .edit-field {
+            margin-bottom: 14px;
+        }
+
+        .edit-field label {
+            display: block;
+            font-size: 12px;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 6px;
+        }
+
+        .edit-field input,
+        .edit-field textarea,
+        .edit-field select {
+            width: 100%;
+            padding: 10px 12px;
+            background: #0f0f0f;
+            border: 1px solid #2a2a2a;
+            border-radius: 8px;
+            color: #e0e0e0;
+            font-size: 14px;
+            font-family: inherit;
+        }
+
+        .edit-field textarea {
+            min-height: 160px;
+            resize: vertical;
+            font-family: monospace;
+            font-size: 13px;
+        }
+
+        .edit-field input:focus,
+        .edit-field textarea:focus,
+        .edit-field select:focus {
+            outline: none;
+            border-color: #3b82f6;
+        }
+
+        .edit-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .edit-actions button {
+            padding: 10px 20px;
+            border-radius: 8px;
+            border: none;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        .edit-save {
+            background: #3b82f6;
+            color: #fff;
+        }
+
+        .edit-cancel {
+            background: #2a2a2a;
+            color: #e0e0e0;
         }
 
         .modal-body pre {
@@ -1150,6 +1229,7 @@
             <div class="modal-header">
                 <h2 id="modal-title">Title</h2>
                 <div class="modal-header-actions">
+                    <button class="modal-edit" id="modal-edit-btn" onclick="enterEditMode()">Edit</button>
                     <button class="modal-delete" onclick="confirmDeleteDetail()">Delete</button>
                     <button class="modal-close" onclick="closeModal()">&times;</button>
                 </div>
@@ -1582,6 +1662,13 @@
             return div.innerHTML;
         }
 
+        // Like escapeHtml, but also safe inside a double-quoted HTML attribute
+        // (escapeHtml alone doesn't escape ", which lets attribute values with
+        // a quote in them break out of e.g. value="...").
+        function escapeAttr(text) {
+            return escapeHtml(text).replace(/"/g, '&quot;');
+        }
+
         // Search
         function makeSearch(apiPath, listId, type, loadFn) {
             return function(query) {
@@ -1677,6 +1764,13 @@
         // Detail modal
         let currentDetailItem = null;
         let currentDetailType = null;
+
+        const UPDATE_ENDPOINTS = {
+            knowledge: 'knowledge',
+            skill: 'skills',
+            project: 'projects',
+            private: 'private',
+        };
 
         const DELETE_ENDPOINTS = {
             knowledge: 'knowledge',
@@ -1784,6 +1878,191 @@
                 }
             } catch (err) {
                 showNotification('Error deleting entry', true);
+            }
+        }
+
+        // Inline edit
+        function enterEditMode() {
+            if (!currentDetailItem || !currentDetailType) return;
+
+            const item = currentDetailItem;
+            const type = currentDetailType;
+            let fields = '';
+
+            if (type === 'knowledge') {
+                fields = `
+                    <div class="edit-field">
+                        <label>Title</label>
+                        <input type="text" id="edit-title" value="${escapeAttr(item.title || '')}">
+                    </div>
+                    <div class="edit-field">
+                        <label>Type</label>
+                        <select id="edit-knowledge_type">
+                            ${['note', 'documentation', 'code_snippet', 'reference', 'howto', 'other']
+                                .map(t => `<option value="${t}" ${item.knowledge_type === t ? 'selected' : ''}>${t}</option>`)
+                                .join('')}
+                        </select>
+                    </div>
+                    <div class="edit-field">
+                        <label>Tags (comma-separated)</label>
+                        <input type="text" id="edit-tags" value="${escapeAttr((item.tags || []).join(', '))}">
+                    </div>
+                    <div class="edit-field">
+                        <label>Source</label>
+                        <input type="text" id="edit-source" value="${escapeAttr(item.source || '')}">
+                    </div>
+                    <div class="edit-field">
+                        <label>Content</label>
+                        <textarea id="edit-content">${escapeHtml(item.content || '')}</textarea>
+                    </div>
+                `;
+            } else if (type === 'skill') {
+                fields = `
+                    <div class="edit-field">
+                        <label>Description</label>
+                        <input type="text" id="edit-description" value="${escapeAttr(item.description || '')}">
+                    </div>
+                    <div class="edit-field">
+                        <label>Version</label>
+                        <input type="text" id="edit-version" value="${escapeAttr(item.version || '1.0.0')}">
+                    </div>
+                    <div class="edit-field">
+                        <label>Tags (comma-separated)</label>
+                        <input type="text" id="edit-tags" value="${escapeAttr((item.tags || []).join(', '))}">
+                    </div>
+                    <div class="edit-field">
+                        <label>Prompt</label>
+                        <textarea id="edit-prompt">${escapeHtml(item.prompt || '')}</textarea>
+                    </div>
+                `;
+            } else if (type === 'project') {
+                fields = `
+                    <div class="edit-field">
+                        <label>Status</label>
+                        <select id="edit-status">
+                            ${['active', 'archived', 'planned']
+                                .map(s => `<option value="${s}" ${(item.status || 'active') === s ? 'selected' : ''}>${s}</option>`)
+                                .join('')}
+                        </select>
+                    </div>
+                    <div class="edit-field">
+                        <label>Path</label>
+                        <input type="text" id="edit-path" value="${escapeAttr(item.path || '')}">
+                    </div>
+                    <div class="edit-field">
+                        <label>Tags (comma-separated)</label>
+                        <input type="text" id="edit-tags" value="${escapeAttr((item.tags || []).join(', '))}">
+                    </div>
+                    <div class="edit-field">
+                        <label>Description</label>
+                        <textarea id="edit-description">${escapeHtml(item.description || '')}</textarea>
+                    </div>
+                `;
+            } else if (type === 'private') {
+                fields = `
+                    <div class="edit-field">
+                        <label>Title</label>
+                        <input type="text" id="edit-title" value="${escapeAttr(item.title || '')}">
+                    </div>
+                    <div class="edit-field">
+                        <label>Type</label>
+                        <select id="edit-private_type">
+                            ${['note', 'context', 'preference', 'secret_ref']
+                                .map(t => `<option value="${t}" ${(item.private_type || 'note') === t ? 'selected' : ''}>${t}</option>`)
+                                .join('')}
+                        </select>
+                    </div>
+                    <div class="edit-field">
+                        <label>Tags (comma-separated)</label>
+                        <input type="text" id="edit-tags" value="${escapeAttr((item.tags || []).join(', '))}">
+                    </div>
+                    <div class="edit-field">
+                        <label>Content</label>
+                        <textarea id="edit-content">${escapeHtml(item.content || '')}</textarea>
+                    </div>
+                `;
+            }
+
+            document.getElementById('modal-body').innerHTML = fields + `
+                <div class="edit-actions">
+                    <button class="edit-save" onclick="saveEdit()">Save</button>
+                    <button class="edit-cancel" onclick="cancelEdit()">Cancel</button>
+                </div>
+            `;
+            document.getElementById('modal-edit-btn').style.display = 'none';
+        }
+
+        function cancelEdit() {
+            document.getElementById('modal-edit-btn').style.display = '';
+            showDetail(currentDetailItem, currentDetailType);
+        }
+
+        function readEditFields(type) {
+            const tags = document.getElementById('edit-tags').value
+                .split(',')
+                .map(t => t.trim())
+                .filter(Boolean);
+
+            if (type === 'knowledge') {
+                return {
+                    title: document.getElementById('edit-title').value.trim(),
+                    content: document.getElementById('edit-content').value,
+                    knowledge_type: document.getElementById('edit-knowledge_type').value,
+                    tags,
+                    source: document.getElementById('edit-source').value.trim() || null,
+                };
+            } else if (type === 'skill') {
+                return {
+                    description: document.getElementById('edit-description').value.trim(),
+                    prompt: document.getElementById('edit-prompt').value,
+                    version: document.getElementById('edit-version').value.trim() || '1.0.0',
+                    tags,
+                };
+            } else if (type === 'project') {
+                return {
+                    description: document.getElementById('edit-description').value,
+                    path: document.getElementById('edit-path').value.trim() || null,
+                    status: document.getElementById('edit-status').value,
+                    tags,
+                };
+            } else if (type === 'private') {
+                return {
+                    title: document.getElementById('edit-title').value.trim(),
+                    content: document.getElementById('edit-content').value,
+                    private_type: document.getElementById('edit-private_type').value,
+                    tags,
+                };
+            }
+            return {};
+        }
+
+        async function saveEdit() {
+            if (!currentDetailItem || !currentDetailType) return;
+
+            const type = currentDetailType;
+            const item = currentDetailItem;
+            const endpoint = UPDATE_ENDPOINTS[type];
+            const body = readEditFields(type);
+
+            try {
+                const res = await fetch(`${API_BASE}/api/${endpoint}/${encodeURIComponent(item.id)}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body),
+                });
+                const result = await res.json();
+
+                if (res.ok && result.success) {
+                    showNotification('Saved successfully');
+                    closeModal();
+                    document.getElementById('modal-edit-btn').style.display = '';
+                    const reload = RELOAD_FUNCTIONS[type];
+                    if (reload) reload();
+                } else {
+                    showNotification(result.error || 'Save failed', true);
+                }
+            } catch (err) {
+                showNotification('Error saving entry', true);
             }
         }
 
