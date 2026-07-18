@@ -5,7 +5,7 @@ After=network.target
 [Service]
 Type=simple
 WorkingDirectory=/home/ximot/knowledge-mcp
-ExecStart=/home/ximot/knowledge-mcp/start.sh
+ExecStart=/home/ximot/knowledge-mcp/scripts/start.sh
 Restart=on-failure
 RestartSec=5
 
