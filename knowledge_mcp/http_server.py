@@ -16,7 +16,8 @@ import hashlib
 import os
 import sys
 import time
-from datetime import datetime
+from collections import defaultdict
+from datetime import datetime, timedelta
 from pathlib import Path
 
 # Add parent dir to path for imports
@@ -29,6 +30,7 @@ from starlette.routing import Route, Mount
 from starlette.responses import JSONResponse, HTMLResponse, FileResponse
 from knowledge_mcp import __version__
 from knowledge_mcp.server import mcp
+from knowledge_mcp.analytics import get_search_counts, record_search
 from knowledge_mcp.config import settings
 from knowledge_mcp.qdrant import QdrantService
 from knowledge_mcp.embeddings import get_embeddings
@@ -137,6 +139,7 @@ async def api_knowledge(request):
     filters = {"tags": tags} if tags else None
 
     if query:
+        record_search()
         vector = await get_embeddings(query)
         results = await _qdrant.search(
             settings.knowledge_collection, vector, limit=limit, filters=filters
@@ -221,6 +224,7 @@ async def api_skills(request):
     filters = {"tags": tags} if tags else None
 
     if query:
+        record_search()
         vector = await get_embeddings(query)
         results = await _qdrant.search(
             settings.skills_collection, vector, limit=limit, filters=filters
@@ -306,6 +310,7 @@ async def api_projects(request):
     filters = {"tags": tags} if tags else None
 
     if query:
+        record_search()
         vector = await get_embeddings(query)
         results = await _qdrant.search(
             settings.projects_collection, vector, limit=limit, filters=filters
@@ -390,6 +395,7 @@ async def api_private(request):
     filters = {"tags": tags} if tags else None
 
     if query:
+        record_search()
         vector = await get_embeddings(query)
         results = await _qdrant.search(
             settings.private_collection, vector, limit=limit, filters=filters
@@ -429,6 +435,52 @@ async def api_private_add(request):
     await _qdrant.ensure_collections()
     await _qdrant.upsert(settings.private_collection, priv_id, vector, payload)
     return JSONResponse({"success": True, "id": priv_id})
+
+
+async def api_analytics(request):
+    """Aggregate data for the dashboard's usage analytics charts."""
+    await _qdrant.ensure_collections()
+
+    collections = {
+        "knowledge": settings.knowledge_collection,
+        "skills": settings.skills_collection,
+        "projects": settings.projects_collection,
+        "private": settings.private_collection,
+    }
+
+    entries_by_date: dict[str, int] = defaultdict(int)
+    tag_counts: dict[str, int] = defaultdict(int)
+    collection_sizes: dict[str, int] = {}
+
+    for label, collection in collections.items():
+        results, total = await _qdrant.list_all(collection, limit=10000)
+        collection_sizes[label] = total
+
+        for entry in results:
+            created_at = entry.get("created_at")
+            if created_at:
+                entries_by_date[str(created_at)[:10]] += 1
+            for tag in entry.get("tags") or []:
+                tag_counts[tag] += 1
+
+    today = datetime.utcnow().date()
+    entries_over_time = {
+        (today - timedelta(days=offset)).isoformat(): entries_by_date.get(
+            (today - timedelta(days=offset)).isoformat(), 0
+        )
+        for offset in range(29, -1, -1)
+    }
+
+    top_tags = sorted(tag_counts.items(), key=lambda kv: kv[1], reverse=True)[:10]
+
+    return JSONResponse(
+        {
+            "entries_over_time": entries_over_time,
+            "top_tags": [{"tag": tag, "count": count} for tag, count in top_tags],
+            "searches_per_day": get_search_counts(days=14),
+            "collection_sizes": collection_sizes,
+        }
+    )
 
 
 async def api_private_update(request):
@@ -633,6 +685,7 @@ def main():
         Route("/api/private/{id}", api_private_delete, methods=["DELETE"]),
         Route("/api/stats", api_stats, methods=["GET"]),
         Route("/api/graph", api_graph, methods=["GET"]),
+        Route("/api/analytics", api_analytics, methods=["GET"]),
         # Dashboard UI
         Route("/dashboard", dashboard_index, methods=["GET"]),
         Route("/dashboard/", dashboard_index, methods=["GET"]),

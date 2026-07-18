@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field, ConfigDict
 from mcp.server.fastmcp import FastMCP
 from mcp.types import ToolAnnotations
 
+from .analytics import record_search
 from .embeddings import get_embeddings
 from .qdrant import QdrantService
 
@@ -588,6 +589,8 @@ async def knowledge_search(params: KnowledgeSearchInput) -> str:
         Matching knowledge entries in requested format
     """
     try:
+        record_search()
+
         # Get embeddings for query
         query_embedding = await get_embeddings(params.query)
 
@@ -914,6 +917,8 @@ async def skill_search(params: SkillSearchInput) -> str:
         Matching skills
     """
     try:
+        record_search()
+
         query_embedding = await get_embeddings(params.query)
 
         results = await qdrant.search(
@@ -1201,6 +1206,8 @@ async def project_search(params: ProjectSearchInput) -> str:
         Matching projects
     """
     try:
+        record_search()
+
         query_embedding = await get_embeddings(params.query)
 
         filters: Dict[str, Union[str, List[str]]] = {}
@@ -1514,6 +1521,8 @@ async def private_search(params: PrivateSearchInput) -> str:
         Matching private entries
     """
     try:
+        record_search()
+
         query_embedding = await get_embeddings(params.query)
 
         filters: Dict[str, Union[str, List[str]]] = {}

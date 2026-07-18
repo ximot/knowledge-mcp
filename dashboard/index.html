@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Knowledge MCP Dashboard</title>
     <script src="https://unpkg.com/vis-network@9.1.9/dist/vis-network.min.js"></script>
+    <script src="https://unpkg.com/chart.js@4.4.4/dist/chart.umd.js"></script>
     <style>
         * {
             margin: 0;
@@ -926,6 +927,24 @@
             font-size: 14px;
         }
 
+        /* Analytics */
+        .analytics-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .analytics-grid .card {
+            height: 320px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .analytics-grid canvas {
+            flex: 1;
+            min-height: 0;
+        }
+
         /* Responsive: cards stack, modal fills the screen, tabs scroll horizontally */
         @media (max-width: 768px) {
             .container {
@@ -1124,6 +1143,7 @@
         <div class="view-tabs">
             <button class="view-tab active" onclick="switchView('list')">Knowledge & Skills</button>
             <button class="view-tab" onclick="switchView('graph')">Tag Graph</button>
+            <button class="view-tab" onclick="switchView('analytics')">Analytics</button>
         </div>
 
         <!-- List View -->
@@ -1219,6 +1239,28 @@
                     <div class="legend-item"><span class="legend-dot tag"></span> Tag (click to filter)</div>
                 </div>
                 <div class="graph-stats" id="graph-stats"></div>
+            </div>
+        </div>
+
+        <!-- Analytics View -->
+        <div id="analytics-view" class="view-content">
+            <div class="analytics-grid">
+                <div class="card">
+                    <div class="card-header"><span class="card-title">Entries Added (last 30 days)</span></div>
+                    <canvas id="chart-entries-over-time"></canvas>
+                </div>
+                <div class="card">
+                    <div class="card-header"><span class="card-title">Top Tags</span></div>
+                    <canvas id="chart-top-tags"></canvas>
+                </div>
+                <div class="card">
+                    <div class="card-header"><span class="card-title">Searches per Day (last 14 days)</span></div>
+                    <canvas id="chart-searches-per-day"></canvas>
+                </div>
+                <div class="card">
+                    <div class="card-header"><span class="card-title">Collection Size Breakdown</span></div>
+                    <canvas id="chart-collection-sizes"></canvas>
+                </div>
             </div>
         </div>
     </div>
@@ -2309,6 +2351,10 @@
                 if (!graphLoaded) {
                     loadGraph();
                 }
+            } else if (view === 'analytics') {
+                document.querySelectorAll('.view-tab')[2].classList.add('active');
+                document.getElementById('analytics-view').classList.add('active');
+                loadAnalytics();
             } else {
                 document.querySelectorAll('.view-tab')[0].classList.add('active');
                 document.getElementById('list-view').classList.add('active');
@@ -2569,6 +2615,102 @@
                 return `<b>${escapeHtml(node.title || node.label)}</b><br>Type: ${node.knowledge_type}<br>Tags: ${tags}`;
             }
             return `<b>${escapeHtml(node.label)}</b><br>${escapeHtml(node.description || '')}<br>Tags: ${tags}`;
+        }
+
+        // ========== ANALYTICS ==========
+        const analyticsCharts = {};
+
+        function renderChart(canvasId, config) {
+            if (analyticsCharts[canvasId]) {
+                analyticsCharts[canvasId].destroy();
+            }
+            const ctx = document.getElementById(canvasId).getContext('2d');
+            analyticsCharts[canvasId] = new Chart(ctx, config);
+        }
+
+        const CHART_COLORS = ['#3b82f6', '#22c55e', '#f59e0b', '#a855f7', '#ef4444', '#06b6d4', '#ec4899', '#84cc16'];
+
+        async function loadAnalytics() {
+            try {
+                const res = await fetch(`${API_BASE}/api/analytics`);
+                const data = await res.json();
+                renderAnalyticsCharts(data);
+            } catch (e) {
+                console.error('Analytics load error:', e);
+            }
+        }
+
+        function renderAnalyticsCharts(data) {
+            const chartDefaults = {
+                plugins: { legend: { labels: { color: '#e0e0e0' } } },
+                scales: {
+                    x: { ticks: { color: '#888' }, grid: { color: '#2a2a2a' } },
+                    y: { ticks: { color: '#888' }, grid: { color: '#2a2a2a' }, beginAtZero: true },
+                },
+                maintainAspectRatio: false,
+            };
+
+            const entryDates = Object.keys(data.entries_over_time || {});
+            renderChart('chart-entries-over-time', {
+                type: 'line',
+                data: {
+                    labels: entryDates.map(d => d.slice(5)),
+                    datasets: [{
+                        label: 'Entries added',
+                        data: entryDates.map(d => data.entries_over_time[d]),
+                        borderColor: '#3b82f6',
+                        backgroundColor: '#3b82f633',
+                        tension: 0.3,
+                        fill: true,
+                    }],
+                },
+                options: { ...chartDefaults, plugins: { legend: { display: false } } },
+            });
+
+            const topTags = data.top_tags || [];
+            renderChart('chart-top-tags', {
+                type: 'bar',
+                data: {
+                    labels: topTags.map(t => t.tag),
+                    datasets: [{
+                        label: 'Uses',
+                        data: topTags.map(t => t.count),
+                        backgroundColor: CHART_COLORS,
+                    }],
+                },
+                options: { ...chartDefaults, plugins: { legend: { display: false } }, indexAxis: 'y' },
+            });
+
+            const searchDates = Object.keys(data.searches_per_day || {});
+            renderChart('chart-searches-per-day', {
+                type: 'bar',
+                data: {
+                    labels: searchDates.map(d => d.slice(5)),
+                    datasets: [{
+                        label: 'Searches',
+                        data: searchDates.map(d => data.searches_per_day[d]),
+                        backgroundColor: '#22c55e',
+                    }],
+                },
+                options: { ...chartDefaults, plugins: { legend: { display: false } } },
+            });
+
+            const sizes = data.collection_sizes || {};
+            const sizeLabels = Object.keys(sizes);
+            renderChart('chart-collection-sizes', {
+                type: 'doughnut',
+                data: {
+                    labels: sizeLabels,
+                    datasets: [{
+                        data: sizeLabels.map(k => sizes[k]),
+                        backgroundColor: CHART_COLORS,
+                    }],
+                },
+                options: {
+                    plugins: { legend: { labels: { color: '#e0e0e0' } } },
+                    maintainAspectRatio: false,
+                },
+            });
         }
     </script>
 </body>
