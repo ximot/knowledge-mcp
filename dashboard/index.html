@@ -345,12 +345,33 @@
             margin-bottom: 20px;
         }
 
+        .modal-header-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
         .modal-close {
             background: none;
             border: none;
             color: #888;
             font-size: 24px;
             cursor: pointer;
+        }
+
+        .modal-delete {
+            background: none;
+            border: 1px solid #a33;
+            color: #e55;
+            border-radius: 6px;
+            padding: 5px 12px;
+            font-size: 13px;
+            cursor: pointer;
+        }
+
+        .modal-delete:hover {
+            background: #a33;
+            color: #fff;
         }
 
         .modal-body {
@@ -589,6 +610,45 @@
         .legend-dot.skill {
             background: #22c55e;
             border-radius: 50%;
+        }
+
+        .legend-dot.tag {
+            background: #f59e0b;
+            border-radius: 3px;
+            transform: rotate(45deg);
+        }
+
+        .tag-filters {
+            display: none;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 15px;
+        }
+
+        .tag-filters.active {
+            display: flex;
+        }
+
+        .tag-chip {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: #f59e0b22;
+            border: 1px solid #f59e0b;
+            color: #f59e0b;
+            border-radius: 20px;
+            padding: 4px 8px 4px 12px;
+            font-size: 13px;
+        }
+
+        .tag-chip button {
+            background: none;
+            border: none;
+            color: #f59e0b;
+            cursor: pointer;
+            font-size: 15px;
+            line-height: 1;
+            padding: 0 2px;
         }
 
         .graph-stats {
@@ -970,6 +1030,9 @@
         <!-- List View -->
         <div id="list-view" class="view-content active">
 
+        <!-- Active tag filters (from clicking a tag node on the graph) -->
+        <div class="tag-filters" id="tag-filters"></div>
+
         <!-- Collection Tabs -->
         <div class="tabs" id="collection-tabs">
             <button class="tab active" onclick="switchCollection('knowledge')">Knowledge</button>
@@ -1054,6 +1117,7 @@
                 <div class="graph-legend">
                     <div class="legend-item"><span class="legend-dot knowledge"></span> Knowledge</div>
                     <div class="legend-item"><span class="legend-dot skill"></span> Skill</div>
+                    <div class="legend-item"><span class="legend-dot tag"></span> Tag (click to filter)</div>
                 </div>
                 <div class="graph-stats" id="graph-stats"></div>
             </div>
@@ -1065,7 +1129,10 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2 id="modal-title">Title</h2>
-                <button class="modal-close" onclick="closeModal()">&times;</button>
+                <div class="modal-header-actions">
+                    <button class="modal-delete" onclick="confirmDeleteDetail()">Delete</button>
+                    <button class="modal-close" onclick="closeModal()">&times;</button>
+                </div>
             </div>
             <div class="modal-body" id="modal-body"></div>
         </div>
@@ -1327,10 +1394,60 @@
             document.getElementById(`panel-${name}`).style.display = 'block';
         }
 
+        // Tag filters (populated by clicking a tag node on the graph view)
+        let activeTagFilters = [];
+
+        function tagQueryParam() {
+            return activeTagFilters.length
+                ? `&tags=${encodeURIComponent(activeTagFilters.join(','))}`
+                : '';
+        }
+
+        function filterByTag(tag) {
+            if (!activeTagFilters.includes(tag)) {
+                activeTagFilters.push(tag);
+            }
+            renderTagFilterChips();
+            reloadAllLists();
+            switchView('list');
+        }
+
+        function removeTagFilter(tag) {
+            activeTagFilters = activeTagFilters.filter(t => t !== tag);
+            renderTagFilterChips();
+            reloadAllLists();
+        }
+
+        function clearTagFilters() {
+            activeTagFilters = [];
+            renderTagFilterChips();
+            reloadAllLists();
+        }
+
+        function renderTagFilterChips() {
+            const container = document.getElementById('tag-filters');
+            container.classList.toggle('active', activeTagFilters.length > 0);
+            container.innerHTML = activeTagFilters.map(tag => `
+                <span class="tag-chip">
+                    #${escapeHtml(tag)}
+                    <button onclick="removeTagFilter('${escapeHtml(tag).replace(/'/g, "\\'")}')" title="Remove filter">&times;</button>
+                </span>
+            `).join('') + (activeTagFilters.length > 1
+                ? `<span class="tag-chip" style="cursor:pointer" onclick="clearTagFilters()">Clear all</span>`
+                : '');
+        }
+
+        function reloadAllLists() {
+            loadKnowledge();
+            loadSkills();
+            loadProjects();
+            loadPrivate();
+        }
+
         // Load data
         async function loadKnowledge() {
             try {
-                const res = await fetch(`${API_BASE}/api/knowledge?limit=50`);
+                const res = await fetch(`${API_BASE}/api/knowledge?limit=50${tagQueryParam()}`);
                 const data = await res.json();
                 document.getElementById('stat-knowledge').textContent = data.count;
                 renderList('knowledge-list', data.results, 'knowledge');
@@ -1341,7 +1458,7 @@
 
         async function loadSkills() {
             try {
-                const res = await fetch(`${API_BASE}/api/skills?limit=50`);
+                const res = await fetch(`${API_BASE}/api/skills?limit=50${tagQueryParam()}`);
                 const data = await res.json();
                 document.getElementById('stat-skills').textContent = data.count;
                 renderList('skills-list', data.results, 'skill');
@@ -1352,7 +1469,7 @@
 
         async function loadProjects() {
             try {
-                const res = await fetch(`${API_BASE}/api/projects?limit=50`);
+                const res = await fetch(`${API_BASE}/api/projects?limit=50${tagQueryParam()}`);
                 const data = await res.json();
                 document.getElementById('stat-projects').textContent = data.count;
                 renderList('projects-list', data.results, 'project');
@@ -1363,7 +1480,7 @@
 
         async function loadPrivate() {
             try {
-                const res = await fetch(`${API_BASE}/api/private?limit=50`);
+                const res = await fetch(`${API_BASE}/api/private?limit=50${tagQueryParam()}`);
                 const data = await res.json();
                 document.getElementById('stat-private').textContent = data.count;
                 renderList('private-list', data.results, 'private');
@@ -1520,7 +1637,27 @@
         }
 
         // Detail modal
+        let currentDetailItem = null;
+        let currentDetailType = null;
+
+        const DELETE_ENDPOINTS = {
+            knowledge: 'knowledge',
+            skill: 'skills',
+            project: 'projects',
+            private: 'private',
+        };
+
+        const RELOAD_FUNCTIONS = {
+            knowledge: loadKnowledge,
+            skill: loadSkills,
+            project: loadProjects,
+            private: loadPrivate,
+        };
+
         function showDetail(item, type) {
+            currentDetailItem = item;
+            currentDetailType = type;
+
             const modal = document.getElementById('detail-modal');
             let title, body = '';
 
@@ -1578,6 +1715,38 @@
 
         function closeModal() {
             document.getElementById('detail-modal').classList.remove('active');
+        }
+
+        async function confirmDeleteDetail() {
+            if (!currentDetailItem || !currentDetailType) return;
+
+            const item = currentDetailItem;
+            const type = currentDetailType;
+            const label = item.title || item.name || item.id;
+
+            if (!confirm(`Are you sure you want to delete "${label}"? This cannot be undone.`)) {
+                return;
+            }
+
+            const endpoint = DELETE_ENDPOINTS[type];
+            try {
+                const res = await fetch(`${API_BASE}/api/${endpoint}/${encodeURIComponent(item.id)}`, {
+                    method: 'DELETE',
+                });
+                const result = await res.json();
+
+                if (res.ok && result.success) {
+                    showNotification(`Deleted "${label}"`);
+                    closeModal();
+                    const reload = RELOAD_FUNCTIONS[type];
+                    if (reload) reload();
+                    loadStats();
+                } else {
+                    showNotification(result.error || 'Delete failed', true);
+                }
+            } catch (err) {
+                showNotification('Error deleting entry', true);
+            }
         }
 
         // Add forms
@@ -1956,18 +2125,32 @@
             const container = document.getElementById('graph-container');
 
             // Transform nodes for vis.js (store globally for filtering)
-            graphNodes = new vis.DataSet(data.nodes.map(n => ({
-                id: n.id,
-                label: n.label || n.id.substring(0, 10),
-                title: buildNodeTooltip(n),
-                color: n.type === 'knowledge'
-                    ? { background: '#3b82f6', border: '#2563eb', highlight: { background: '#60a5fa', border: '#3b82f6' } }
-                    : { background: '#22c55e', border: '#16a34a', highlight: { background: '#4ade80', border: '#22c55e' } },
-                shape: n.type === 'knowledge' ? 'box' : 'ellipse',
-                font: { color: '#fff', size: 12 },
-                // Store original data for click handler
-                originalData: n
-            })));
+            graphNodes = new vis.DataSet(data.nodes.map(n => {
+                if (n.type === 'tag') {
+                    return {
+                        id: n.id,
+                        label: n.label || `#${n.tag}`,
+                        title: `Tag: ${n.tag} (${n.count} item${n.count === 1 ? '' : 's'}) — click to filter`,
+                        color: { background: '#f59e0b', border: '#d97706', highlight: { background: '#fbbf24', border: '#f59e0b' } },
+                        shape: 'diamond',
+                        size: 16,
+                        font: { color: '#fff', size: 12 },
+                        originalData: n,
+                    };
+                }
+                return {
+                    id: n.id,
+                    label: n.label || n.id.substring(0, 10),
+                    title: buildNodeTooltip(n),
+                    color: n.type === 'knowledge'
+                        ? { background: '#3b82f6', border: '#2563eb', highlight: { background: '#60a5fa', border: '#3b82f6' } }
+                        : { background: '#22c55e', border: '#16a34a', highlight: { background: '#4ade80', border: '#22c55e' } },
+                    shape: n.type === 'knowledge' ? 'box' : 'ellipse',
+                    font: { color: '#fff', size: 12 },
+                    // Store original data for click handler
+                    originalData: n
+                };
+            }));
 
             // Transform edges for vis.js (store globally for filtering)
             graphEdges = new vis.DataSet(data.edges.map((e, i) => ({
@@ -1975,8 +2158,11 @@
                 from: e.from,
                 to: e.to,
                 title: `Tags: ${e.tags.join(', ')}`,
-                value: e.tags.length, // thicker line = more shared tags
-                color: { color: '#444', highlight: '#3b82f6', hover: '#666' },
+                value: e.isTagEdge ? 1 : e.tags.length, // thicker line = more shared tags
+                dashes: !!e.isTagEdge,
+                color: e.isTagEdge
+                    ? { color: '#f59e0b55', highlight: '#f59e0b', hover: '#f59e0b' }
+                    : { color: '#444', highlight: '#3b82f6', hover: '#666' },
                 smooth: { type: 'continuous' }
             })));
 
@@ -2010,14 +2196,18 @@
 
             graphNetwork = new vis.Network(container, { nodes: graphNodes, edges: graphEdges }, options);
 
-            // Click on node -> show detail modal
+            // Click on node -> filter by tag, or show detail modal
             graphNetwork.on('click', (params) => {
                 if (params.nodes.length > 0) {
                     const nodeId = params.nodes[0];
                     const node = graphNodes.get(nodeId);
                     if (node && node.originalData) {
                         const n = node.originalData;
-                        showDetail(n, n.type);
+                        if (n.type === 'tag') {
+                            filterByTag(n.tag);
+                        } else {
+                            showDetail(n, n.type);
+                        }
                     }
                 }
             });
