@@ -13,6 +13,7 @@ Or with uv:
 """
 
 import hashlib
+import hmac
 import os
 import sys
 import time
@@ -26,6 +27,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import httpx
 import uvicorn
 from starlette.applications import Starlette
+from starlette.middleware import Middleware
+from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.routing import Route, Mount
 from starlette.responses import JSONResponse, HTMLResponse, FileResponse
 from knowledge_mcp import __version__
@@ -43,6 +46,35 @@ _start_time = time.time()
 
 # Path to dashboard directory (sibling of knowledge_mcp package)
 DASHBOARD_DIR = Path(__file__).resolve().parent.parent / "dashboard"
+
+
+# ---------------------------------------------------------------------------
+# Auth
+# ---------------------------------------------------------------------------
+
+# Paths that stay reachable without a token even when MCP_AUTH_TOKEN is set.
+# /dashboard is just the static HTML/JS shell — it holds no data itself and
+# prompts for the token client-side before calling any /api/* endpoint.
+_AUTH_EXEMPT_PATHS = {"/health", "/dashboard", "/dashboard/"}
+
+
+class BearerAuthMiddleware(BaseHTTPMiddleware):
+    """Requires `Authorization: Bearer <token>` on /api/* and /mcp.
+
+    A no-op when settings.auth_token is unset, so trusted-network-only
+    deployments keep working without any configuration.
+    """
+
+    async def dispatch(self, request, call_next):
+        if not settings.auth_token or request.url.path in _AUTH_EXEMPT_PATHS:
+            return await call_next(request)
+
+        header = request.headers.get("authorization", "")
+        scheme, _, token = header.partition(" ")
+        if scheme.lower() != "bearer" or not hmac.compare_digest(token, settings.auth_token):
+            return JSONResponse({"error": "unauthorized"}, status_code=401)
+
+        return await call_next(request)
 
 
 # ---------------------------------------------------------------------------
@@ -693,7 +725,16 @@ def main():
         Mount("/", mcp_app),
     ]
 
-    app = Starlette(routes=routes, lifespan=mcp_app.router.lifespan_context)
+    app = Starlette(
+        routes=routes,
+        lifespan=mcp_app.router.lifespan_context,
+        middleware=[Middleware(BearerAuthMiddleware)],
+    )
+
+    if settings.auth_token:
+        print("  Auth: MCP_AUTH_TOKEN set — bearer token required on /api/*, /mcp, /dashboard")
+    else:
+        print("  Auth: MCP_AUTH_TOKEN not set — server is open on the network it binds to")
 
     uvicorn.run(app, host=host, port=port)
 

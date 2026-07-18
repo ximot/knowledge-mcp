@@ -1430,6 +1430,43 @@
         // Use relative URLs — dashboard is served from the same origin as the API
         const API_BASE = '';
 
+        // Optional bearer token (only needed if the server was started with
+        // MCP_AUTH_TOKEN). Stored locally, attached to every /api/* and /mcp
+        // call, and requested once on first 401.
+        const AUTH_TOKEN_KEY = 'kmcp_auth_token';
+        let _promptingForToken = false;
+
+        function getAuthToken() {
+            return localStorage.getItem(AUTH_TOKEN_KEY) || '';
+        }
+
+        const _nativeFetch = window.fetch.bind(window);
+        window.fetch = async function (input, init) {
+            const token = getAuthToken();
+            if (token) {
+                init = init || {};
+                init.headers = new Headers(init.headers || {});
+                init.headers.set('Authorization', `Bearer ${token}`);
+            }
+
+            const res = await _nativeFetch(input, init);
+
+            if (res.status === 401 && !_promptingForToken) {
+                _promptingForToken = true;
+                const entered = window.prompt('This server requires an API token (MCP_AUTH_TOKEN). Enter it:');
+                _promptingForToken = false;
+                if (entered) {
+                    localStorage.setItem(AUTH_TOKEN_KEY, entered.trim());
+                    init = init || {};
+                    init.headers = new Headers(init.headers || {});
+                    init.headers.set('Authorization', `Bearer ${entered.trim()}`);
+                    return _nativeFetch(input, init);
+                }
+            }
+
+            return res;
+        };
+
         let searchCount = 0;
         let searchTimeout = null;
         let activeCollection = 'knowledge';
