@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Knowledge MCP Dashboard</title>
     <script src="https://unpkg.com/vis-network@9.1.9/dist/vis-network.min.js"></script>
+    <script src="https://unpkg.com/chart.js@4.4.4/dist/chart.umd.js"></script>
     <style>
         * {
             margin: 0;
@@ -42,8 +43,27 @@
 
         .status-indicators {
             display: flex;
+            align-items: center;
             gap: 15px;
             position: relative;
+        }
+
+        .refresh-indicator {
+            display: inline-block;
+            color: #666;
+            font-size: 16px;
+            opacity: 0;
+            transition: opacity 0.15s;
+        }
+
+        .refresh-indicator.active {
+            opacity: 1;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
         }
 
         .status {
@@ -345,6 +365,12 @@
             margin-bottom: 20px;
         }
 
+        .modal-header-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
         .modal-close {
             background: none;
             border: none;
@@ -353,9 +379,103 @@
             cursor: pointer;
         }
 
+        .modal-edit {
+            background: none;
+            border: 1px solid #3b82f6;
+            color: #3b82f6;
+            border-radius: 6px;
+            padding: 5px 12px;
+            font-size: 13px;
+            cursor: pointer;
+        }
+
+        .modal-delete {
+            background: none;
+            border: 1px solid #a33;
+            color: #e55;
+            border-radius: 6px;
+            padding: 5px 12px;
+            font-size: 13px;
+            cursor: pointer;
+        }
+
+        .modal-edit:hover {
+            background: #3b82f6;
+            color: #fff;
+        }
+
+        .modal-delete:hover {
+            background: #a33;
+            color: #fff;
+        }
+
         .modal-body {
             color: #ccc;
             line-height: 1.6;
+        }
+
+        .edit-field {
+            margin-bottom: 14px;
+        }
+
+        .edit-field label {
+            display: block;
+            font-size: 12px;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 6px;
+        }
+
+        .edit-field input,
+        .edit-field textarea,
+        .edit-field select {
+            width: 100%;
+            padding: 10px 12px;
+            background: #0f0f0f;
+            border: 1px solid #2a2a2a;
+            border-radius: 8px;
+            color: #e0e0e0;
+            font-size: 14px;
+            font-family: inherit;
+        }
+
+        .edit-field textarea {
+            min-height: 160px;
+            resize: vertical;
+            font-family: monospace;
+            font-size: 13px;
+        }
+
+        .edit-field input:focus,
+        .edit-field textarea:focus,
+        .edit-field select:focus {
+            outline: none;
+            border-color: #3b82f6;
+        }
+
+        .edit-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .edit-actions button {
+            padding: 10px 20px;
+            border-radius: 8px;
+            border: none;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        .edit-save {
+            background: #3b82f6;
+            color: #fff;
+        }
+
+        .edit-cancel {
+            background: #2a2a2a;
+            color: #e0e0e0;
         }
 
         .modal-body pre {
@@ -591,6 +711,45 @@
             border-radius: 50%;
         }
 
+        .legend-dot.tag {
+            background: #f59e0b;
+            border-radius: 3px;
+            transform: rotate(45deg);
+        }
+
+        .tag-filters {
+            display: none;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 15px;
+        }
+
+        .tag-filters.active {
+            display: flex;
+        }
+
+        .tag-chip {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: #f59e0b22;
+            border: 1px solid #f59e0b;
+            color: #f59e0b;
+            border-radius: 20px;
+            padding: 4px 8px 4px 12px;
+            font-size: 13px;
+        }
+
+        .tag-chip button {
+            background: none;
+            border: none;
+            color: #f59e0b;
+            cursor: pointer;
+            font-size: 15px;
+            line-height: 1;
+            padding: 0 2px;
+        }
+
         .graph-stats {
             position: absolute;
             top: 15px;
@@ -767,6 +926,108 @@
             color: #888;
             font-size: 14px;
         }
+
+        /* Analytics */
+        .analytics-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .analytics-grid .card {
+            height: 320px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .analytics-grid canvas {
+            flex: 1;
+            min-height: 0;
+        }
+
+        /* Responsive: cards stack, modal fills the screen, tabs scroll horizontally */
+        @media (max-width: 768px) {
+            .container {
+                padding: 12px;
+            }
+
+            header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 12px;
+            }
+
+            .status-indicators {
+                width: 100%;
+                flex-wrap: wrap;
+            }
+
+            .health-panel {
+                width: calc(100vw - 24px);
+                right: -12px;
+            }
+
+            .main-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .card {
+                padding: 15px;
+            }
+
+            .card-header {
+                flex-wrap: wrap;
+                gap: 10px;
+            }
+
+            .tabs,
+            .view-tabs {
+                flex-wrap: nowrap;
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+                padding-bottom: 4px;
+            }
+
+            .tab,
+            .view-tab {
+                flex: 0 0 auto;
+            }
+
+            .modal-content {
+                width: 100%;
+                max-width: 100%;
+                height: 100%;
+                max-height: 100%;
+                border-radius: 0;
+                padding: 16px;
+            }
+
+            .graph-container {
+                height: 420px;
+            }
+
+            .graph-legend {
+                font-size: 11px;
+                padding: 8px 10px;
+            }
+
+            .notification {
+                left: 12px;
+                right: 12px;
+                bottom: 12px;
+                text-align: center;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .stat-value {
+                font-size: 28px;
+            }
+
+            h1 {
+                font-size: 20px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -774,6 +1035,7 @@
         <header>
             <h1>Knowledge MCP Dashboard</h1>
             <div class="status-indicators">
+                <span class="refresh-indicator" id="refresh-indicator" title="Refreshing...">&#8635;</span>
                 <div class="status">
                     <span class="status-dot checking" id="status-qdrant"></span>
                     <span>Qdrant</span>
@@ -881,10 +1143,14 @@
         <div class="view-tabs">
             <button class="view-tab active" onclick="switchView('list')">Knowledge & Skills</button>
             <button class="view-tab" onclick="switchView('graph')">Tag Graph</button>
+            <button class="view-tab" onclick="switchView('analytics')">Analytics</button>
         </div>
 
         <!-- List View -->
         <div id="list-view" class="view-content active">
+
+        <!-- Active tag filters (from clicking a tag node on the graph) -->
+        <div class="tag-filters" id="tag-filters"></div>
 
         <!-- Collection Tabs -->
         <div class="tabs" id="collection-tabs">
@@ -970,8 +1236,31 @@
                 <div class="graph-legend">
                     <div class="legend-item"><span class="legend-dot knowledge"></span> Knowledge</div>
                     <div class="legend-item"><span class="legend-dot skill"></span> Skill</div>
+                    <div class="legend-item"><span class="legend-dot tag"></span> Tag (click to filter)</div>
                 </div>
                 <div class="graph-stats" id="graph-stats"></div>
+            </div>
+        </div>
+
+        <!-- Analytics View -->
+        <div id="analytics-view" class="view-content">
+            <div class="analytics-grid">
+                <div class="card">
+                    <div class="card-header"><span class="card-title">Entries Added (last 30 days)</span></div>
+                    <canvas id="chart-entries-over-time"></canvas>
+                </div>
+                <div class="card">
+                    <div class="card-header"><span class="card-title">Top Tags</span></div>
+                    <canvas id="chart-top-tags"></canvas>
+                </div>
+                <div class="card">
+                    <div class="card-header"><span class="card-title">Searches per Day (last 14 days)</span></div>
+                    <canvas id="chart-searches-per-day"></canvas>
+                </div>
+                <div class="card">
+                    <div class="card-header"><span class="card-title">Collection Size Breakdown</span></div>
+                    <canvas id="chart-collection-sizes"></canvas>
+                </div>
             </div>
         </div>
     </div>
@@ -981,7 +1270,11 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2 id="modal-title">Title</h2>
-                <button class="modal-close" onclick="closeModal()">&times;</button>
+                <div class="modal-header-actions">
+                    <button class="modal-edit" id="modal-edit-btn" onclick="enterEditMode()">Edit</button>
+                    <button class="modal-delete" onclick="confirmDeleteDetail()">Delete</button>
+                    <button class="modal-close" onclick="closeModal()">&times;</button>
+                </div>
             </div>
             <div class="modal-body" id="modal-body"></div>
         </div>
@@ -1173,7 +1466,23 @@
         }
 
         // Check services status via /health endpoint
+        // Visual indicator (spinning icon) shown while a background refresh is in flight
+        let activeRefreshes = 0;
+
+        function beginRefresh() {
+            activeRefreshes++;
+            document.getElementById('refresh-indicator').classList.add('active');
+        }
+
+        function endRefresh() {
+            activeRefreshes = Math.max(0, activeRefreshes - 1);
+            if (activeRefreshes === 0) {
+                document.getElementById('refresh-indicator').classList.remove('active');
+            }
+        }
+
         async function checkStatus() {
+            beginRefresh();
             try {
                 const res = await fetch(`${API_BASE}/health`);
                 const data = await res.json();
@@ -1206,6 +1515,8 @@
                 setStatus('overall', false);
                 setStatusText('hp-qdrant-status', false);
                 setStatusText('hp-ollama-status', false);
+            } finally {
+                endRefresh();
             }
         }
 
@@ -1243,10 +1554,60 @@
             document.getElementById(`panel-${name}`).style.display = 'block';
         }
 
+        // Tag filters (populated by clicking a tag node on the graph view)
+        let activeTagFilters = [];
+
+        function tagQueryParam() {
+            return activeTagFilters.length
+                ? `&tags=${encodeURIComponent(activeTagFilters.join(','))}`
+                : '';
+        }
+
+        function filterByTag(tag) {
+            if (!activeTagFilters.includes(tag)) {
+                activeTagFilters.push(tag);
+            }
+            renderTagFilterChips();
+            reloadAllLists();
+            switchView('list');
+        }
+
+        function removeTagFilter(tag) {
+            activeTagFilters = activeTagFilters.filter(t => t !== tag);
+            renderTagFilterChips();
+            reloadAllLists();
+        }
+
+        function clearTagFilters() {
+            activeTagFilters = [];
+            renderTagFilterChips();
+            reloadAllLists();
+        }
+
+        function renderTagFilterChips() {
+            const container = document.getElementById('tag-filters');
+            container.classList.toggle('active', activeTagFilters.length > 0);
+            container.innerHTML = activeTagFilters.map(tag => `
+                <span class="tag-chip">
+                    #${escapeHtml(tag)}
+                    <button onclick="removeTagFilter('${escapeHtml(tag).replace(/'/g, "\\'")}')" title="Remove filter">&times;</button>
+                </span>
+            `).join('') + (activeTagFilters.length > 1
+                ? `<span class="tag-chip" style="cursor:pointer" onclick="clearTagFilters()">Clear all</span>`
+                : '');
+        }
+
+        function reloadAllLists() {
+            loadKnowledge();
+            loadSkills();
+            loadProjects();
+            loadPrivate();
+        }
+
         // Load data
         async function loadKnowledge() {
             try {
-                const res = await fetch(`${API_BASE}/api/knowledge?limit=50`);
+                const res = await fetch(`${API_BASE}/api/knowledge?limit=50${tagQueryParam()}`);
                 const data = await res.json();
                 document.getElementById('stat-knowledge').textContent = data.count;
                 renderList('knowledge-list', data.results, 'knowledge');
@@ -1257,7 +1618,7 @@
 
         async function loadSkills() {
             try {
-                const res = await fetch(`${API_BASE}/api/skills?limit=50`);
+                const res = await fetch(`${API_BASE}/api/skills?limit=50${tagQueryParam()}`);
                 const data = await res.json();
                 document.getElementById('stat-skills').textContent = data.count;
                 renderList('skills-list', data.results, 'skill');
@@ -1268,7 +1629,7 @@
 
         async function loadProjects() {
             try {
-                const res = await fetch(`${API_BASE}/api/projects?limit=50`);
+                const res = await fetch(`${API_BASE}/api/projects?limit=50${tagQueryParam()}`);
                 const data = await res.json();
                 document.getElementById('stat-projects').textContent = data.count;
                 renderList('projects-list', data.results, 'project');
@@ -1279,7 +1640,7 @@
 
         async function loadPrivate() {
             try {
-                const res = await fetch(`${API_BASE}/api/private?limit=50`);
+                const res = await fetch(`${API_BASE}/api/private?limit=50${tagQueryParam()}`);
                 const data = await res.json();
                 document.getElementById('stat-private').textContent = data.count;
                 renderList('private-list', data.results, 'private');
@@ -1341,6 +1702,13 @@
             const div = document.createElement('div');
             div.textContent = text;
             return div.innerHTML;
+        }
+
+        // Like escapeHtml, but also safe inside a double-quoted HTML attribute
+        // (escapeHtml alone doesn't escape ", which lets attribute values with
+        // a quote in them break out of e.g. value="...").
+        function escapeAttr(text) {
+            return escapeHtml(text).replace(/"/g, '&quot;');
         }
 
         // Search
@@ -1436,7 +1804,34 @@
         }
 
         // Detail modal
+        let currentDetailItem = null;
+        let currentDetailType = null;
+
+        const UPDATE_ENDPOINTS = {
+            knowledge: 'knowledge',
+            skill: 'skills',
+            project: 'projects',
+            private: 'private',
+        };
+
+        const DELETE_ENDPOINTS = {
+            knowledge: 'knowledge',
+            skill: 'skills',
+            project: 'projects',
+            private: 'private',
+        };
+
+        const RELOAD_FUNCTIONS = {
+            knowledge: loadKnowledge,
+            skill: loadSkills,
+            project: loadProjects,
+            private: loadPrivate,
+        };
+
         function showDetail(item, type) {
+            currentDetailItem = item;
+            currentDetailType = type;
+
             const modal = document.getElementById('detail-modal');
             let title, body = '';
 
@@ -1494,6 +1889,223 @@
 
         function closeModal() {
             document.getElementById('detail-modal').classList.remove('active');
+        }
+
+        async function confirmDeleteDetail() {
+            if (!currentDetailItem || !currentDetailType) return;
+
+            const item = currentDetailItem;
+            const type = currentDetailType;
+            const label = item.title || item.name || item.id;
+
+            if (!confirm(`Are you sure you want to delete "${label}"? This cannot be undone.`)) {
+                return;
+            }
+
+            const endpoint = DELETE_ENDPOINTS[type];
+            try {
+                const res = await fetch(`${API_BASE}/api/${endpoint}/${encodeURIComponent(item.id)}`, {
+                    method: 'DELETE',
+                });
+                const result = await res.json();
+
+                if (res.ok && result.success) {
+                    showNotification(`Deleted "${label}"`);
+                    closeModal();
+                    const reload = RELOAD_FUNCTIONS[type];
+                    if (reload) reload();
+                    loadStats();
+                } else {
+                    showNotification(result.error || 'Delete failed', true);
+                }
+            } catch (err) {
+                showNotification('Error deleting entry', true);
+            }
+        }
+
+        // Inline edit
+        function enterEditMode() {
+            if (!currentDetailItem || !currentDetailType) return;
+
+            const item = currentDetailItem;
+            const type = currentDetailType;
+            let fields = '';
+
+            if (type === 'knowledge') {
+                fields = `
+                    <div class="edit-field">
+                        <label>Title</label>
+                        <input type="text" id="edit-title" value="${escapeAttr(item.title || '')}">
+                    </div>
+                    <div class="edit-field">
+                        <label>Type</label>
+                        <select id="edit-knowledge_type">
+                            ${['note', 'documentation', 'code_snippet', 'reference', 'howto', 'other']
+                                .map(t => `<option value="${t}" ${item.knowledge_type === t ? 'selected' : ''}>${t}</option>`)
+                                .join('')}
+                        </select>
+                    </div>
+                    <div class="edit-field">
+                        <label>Tags (comma-separated)</label>
+                        <input type="text" id="edit-tags" value="${escapeAttr((item.tags || []).join(', '))}">
+                    </div>
+                    <div class="edit-field">
+                        <label>Source</label>
+                        <input type="text" id="edit-source" value="${escapeAttr(item.source || '')}">
+                    </div>
+                    <div class="edit-field">
+                        <label>Content</label>
+                        <textarea id="edit-content">${escapeHtml(item.content || '')}</textarea>
+                    </div>
+                `;
+            } else if (type === 'skill') {
+                fields = `
+                    <div class="edit-field">
+                        <label>Description</label>
+                        <input type="text" id="edit-description" value="${escapeAttr(item.description || '')}">
+                    </div>
+                    <div class="edit-field">
+                        <label>Version</label>
+                        <input type="text" id="edit-version" value="${escapeAttr(item.version || '1.0.0')}">
+                    </div>
+                    <div class="edit-field">
+                        <label>Tags (comma-separated)</label>
+                        <input type="text" id="edit-tags" value="${escapeAttr((item.tags || []).join(', '))}">
+                    </div>
+                    <div class="edit-field">
+                        <label>Prompt</label>
+                        <textarea id="edit-prompt">${escapeHtml(item.prompt || '')}</textarea>
+                    </div>
+                `;
+            } else if (type === 'project') {
+                fields = `
+                    <div class="edit-field">
+                        <label>Status</label>
+                        <select id="edit-status">
+                            ${['active', 'archived', 'planned']
+                                .map(s => `<option value="${s}" ${(item.status || 'active') === s ? 'selected' : ''}>${s}</option>`)
+                                .join('')}
+                        </select>
+                    </div>
+                    <div class="edit-field">
+                        <label>Path</label>
+                        <input type="text" id="edit-path" value="${escapeAttr(item.path || '')}">
+                    </div>
+                    <div class="edit-field">
+                        <label>Tags (comma-separated)</label>
+                        <input type="text" id="edit-tags" value="${escapeAttr((item.tags || []).join(', '))}">
+                    </div>
+                    <div class="edit-field">
+                        <label>Description</label>
+                        <textarea id="edit-description">${escapeHtml(item.description || '')}</textarea>
+                    </div>
+                `;
+            } else if (type === 'private') {
+                fields = `
+                    <div class="edit-field">
+                        <label>Title</label>
+                        <input type="text" id="edit-title" value="${escapeAttr(item.title || '')}">
+                    </div>
+                    <div class="edit-field">
+                        <label>Type</label>
+                        <select id="edit-private_type">
+                            ${['note', 'context', 'preference', 'secret_ref']
+                                .map(t => `<option value="${t}" ${(item.private_type || 'note') === t ? 'selected' : ''}>${t}</option>`)
+                                .join('')}
+                        </select>
+                    </div>
+                    <div class="edit-field">
+                        <label>Tags (comma-separated)</label>
+                        <input type="text" id="edit-tags" value="${escapeAttr((item.tags || []).join(', '))}">
+                    </div>
+                    <div class="edit-field">
+                        <label>Content</label>
+                        <textarea id="edit-content">${escapeHtml(item.content || '')}</textarea>
+                    </div>
+                `;
+            }
+
+            document.getElementById('modal-body').innerHTML = fields + `
+                <div class="edit-actions">
+                    <button class="edit-save" onclick="saveEdit()">Save</button>
+                    <button class="edit-cancel" onclick="cancelEdit()">Cancel</button>
+                </div>
+            `;
+            document.getElementById('modal-edit-btn').style.display = 'none';
+        }
+
+        function cancelEdit() {
+            document.getElementById('modal-edit-btn').style.display = '';
+            showDetail(currentDetailItem, currentDetailType);
+        }
+
+        function readEditFields(type) {
+            const tags = document.getElementById('edit-tags').value
+                .split(',')
+                .map(t => t.trim())
+                .filter(Boolean);
+
+            if (type === 'knowledge') {
+                return {
+                    title: document.getElementById('edit-title').value.trim(),
+                    content: document.getElementById('edit-content').value,
+                    knowledge_type: document.getElementById('edit-knowledge_type').value,
+                    tags,
+                    source: document.getElementById('edit-source').value.trim() || null,
+                };
+            } else if (type === 'skill') {
+                return {
+                    description: document.getElementById('edit-description').value.trim(),
+                    prompt: document.getElementById('edit-prompt').value,
+                    version: document.getElementById('edit-version').value.trim() || '1.0.0',
+                    tags,
+                };
+            } else if (type === 'project') {
+                return {
+                    description: document.getElementById('edit-description').value,
+                    path: document.getElementById('edit-path').value.trim() || null,
+                    status: document.getElementById('edit-status').value,
+                    tags,
+                };
+            } else if (type === 'private') {
+                return {
+                    title: document.getElementById('edit-title').value.trim(),
+                    content: document.getElementById('edit-content').value,
+                    private_type: document.getElementById('edit-private_type').value,
+                    tags,
+                };
+            }
+            return {};
+        }
+
+        async function saveEdit() {
+            if (!currentDetailItem || !currentDetailType) return;
+
+            const type = currentDetailType;
+            const item = currentDetailItem;
+            const endpoint = UPDATE_ENDPOINTS[type];
+            const body = readEditFields(type);
+
+            try {
+                const res = await fetch(`${API_BASE}/api/${endpoint}/${encodeURIComponent(item.id)}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body),
+                });
+                const result = await res.json();
+
+                if (res.ok && result.success) {
+                    showNotification('Saved successfully');
+                    closeModal();
+                    document.getElementById('modal-edit-btn').style.display = '';
+                    const reload = RELOAD_FUNCTIONS[type];
+                    if (reload) reload();
+                } else {
+                    showNotification(result.error || 'Save failed', true);
+                }
+            } catch (err) {
+                showNotification('Error saving entry', true);
+            }
         }
 
         // Add forms
@@ -1680,12 +2292,33 @@
         loadProjects();
         loadPrivate();
 
-        // Auto-refresh
-        setInterval(checkStatus, 30000);      // Status every 30s
-        setInterval(loadStats, 5000);         // Stats every 5s
+        // Auto-refresh — paused while the tab is in the background (Page
+        // Visibility API), so we don't burn requests on a hidden tab.
+        const STATUS_REFRESH_MS = 30000;  // Health check every 30s
+        const STATS_REFRESH_MS = 60000;   // Stats every 60s
+
+        function tick(fn) {
+            return () => {
+                if (document.hidden) return;
+                fn();
+            };
+        }
+
+        setInterval(tick(checkStatus), STATUS_REFRESH_MS);
+        setInterval(tick(loadStats), STATS_REFRESH_MS);
+
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) {
+                // Tab came back into focus — refresh immediately so the
+                // displayed data isn't stale from however long it was hidden.
+                checkStatus();
+                loadStats();
+            }
+        });
 
         // Load only stats (fast endpoint)
         async function loadStats() {
+            beginRefresh();
             try {
                 const res = await fetch(`${API_BASE}/api/stats`);
                 const data = await res.json();
@@ -1695,6 +2328,8 @@
                 document.getElementById('stat-private').textContent = data.private_count;
             } catch (e) {
                 console.error('Stats refresh error:', e);
+            } finally {
+                endRefresh();
             }
         }
 
@@ -1716,6 +2351,10 @@
                 if (!graphLoaded) {
                     loadGraph();
                 }
+            } else if (view === 'analytics') {
+                document.querySelectorAll('.view-tab')[2].classList.add('active');
+                document.getElementById('analytics-view').classList.add('active');
+                loadAnalytics();
             } else {
                 document.querySelectorAll('.view-tab')[0].classList.add('active');
                 document.getElementById('list-view').classList.add('active');
@@ -1872,18 +2511,32 @@
             const container = document.getElementById('graph-container');
 
             // Transform nodes for vis.js (store globally for filtering)
-            graphNodes = new vis.DataSet(data.nodes.map(n => ({
-                id: n.id,
-                label: n.label || n.id.substring(0, 10),
-                title: buildNodeTooltip(n),
-                color: n.type === 'knowledge'
-                    ? { background: '#3b82f6', border: '#2563eb', highlight: { background: '#60a5fa', border: '#3b82f6' } }
-                    : { background: '#22c55e', border: '#16a34a', highlight: { background: '#4ade80', border: '#22c55e' } },
-                shape: n.type === 'knowledge' ? 'box' : 'ellipse',
-                font: { color: '#fff', size: 12 },
-                // Store original data for click handler
-                originalData: n
-            })));
+            graphNodes = new vis.DataSet(data.nodes.map(n => {
+                if (n.type === 'tag') {
+                    return {
+                        id: n.id,
+                        label: n.label || `#${n.tag}`,
+                        title: `Tag: ${n.tag} (${n.count} item${n.count === 1 ? '' : 's'}) — click to filter`,
+                        color: { background: '#f59e0b', border: '#d97706', highlight: { background: '#fbbf24', border: '#f59e0b' } },
+                        shape: 'diamond',
+                        size: 16,
+                        font: { color: '#fff', size: 12 },
+                        originalData: n,
+                    };
+                }
+                return {
+                    id: n.id,
+                    label: n.label || n.id.substring(0, 10),
+                    title: buildNodeTooltip(n),
+                    color: n.type === 'knowledge'
+                        ? { background: '#3b82f6', border: '#2563eb', highlight: { background: '#60a5fa', border: '#3b82f6' } }
+                        : { background: '#22c55e', border: '#16a34a', highlight: { background: '#4ade80', border: '#22c55e' } },
+                    shape: n.type === 'knowledge' ? 'box' : 'ellipse',
+                    font: { color: '#fff', size: 12 },
+                    // Store original data for click handler
+                    originalData: n
+                };
+            }));
 
             // Transform edges for vis.js (store globally for filtering)
             graphEdges = new vis.DataSet(data.edges.map((e, i) => ({
@@ -1891,8 +2544,11 @@
                 from: e.from,
                 to: e.to,
                 title: `Tags: ${e.tags.join(', ')}`,
-                value: e.tags.length, // thicker line = more shared tags
-                color: { color: '#444', highlight: '#3b82f6', hover: '#666' },
+                value: e.isTagEdge ? 1 : e.tags.length, // thicker line = more shared tags
+                dashes: !!e.isTagEdge,
+                color: e.isTagEdge
+                    ? { color: '#f59e0b55', highlight: '#f59e0b', hover: '#f59e0b' }
+                    : { color: '#444', highlight: '#3b82f6', hover: '#666' },
                 smooth: { type: 'continuous' }
             })));
 
@@ -1926,14 +2582,18 @@
 
             graphNetwork = new vis.Network(container, { nodes: graphNodes, edges: graphEdges }, options);
 
-            // Click on node -> show detail modal
+            // Click on node -> filter by tag, or show detail modal
             graphNetwork.on('click', (params) => {
                 if (params.nodes.length > 0) {
                     const nodeId = params.nodes[0];
                     const node = graphNodes.get(nodeId);
                     if (node && node.originalData) {
                         const n = node.originalData;
-                        showDetail(n, n.type);
+                        if (n.type === 'tag') {
+                            filterByTag(n.tag);
+                        } else {
+                            showDetail(n, n.type);
+                        }
                     }
                 }
             });
@@ -1955,6 +2615,102 @@
                 return `<b>${escapeHtml(node.title || node.label)}</b><br>Type: ${node.knowledge_type}<br>Tags: ${tags}`;
             }
             return `<b>${escapeHtml(node.label)}</b><br>${escapeHtml(node.description || '')}<br>Tags: ${tags}`;
+        }
+
+        // ========== ANALYTICS ==========
+        const analyticsCharts = {};
+
+        function renderChart(canvasId, config) {
+            if (analyticsCharts[canvasId]) {
+                analyticsCharts[canvasId].destroy();
+            }
+            const ctx = document.getElementById(canvasId).getContext('2d');
+            analyticsCharts[canvasId] = new Chart(ctx, config);
+        }
+
+        const CHART_COLORS = ['#3b82f6', '#22c55e', '#f59e0b', '#a855f7', '#ef4444', '#06b6d4', '#ec4899', '#84cc16'];
+
+        async function loadAnalytics() {
+            try {
+                const res = await fetch(`${API_BASE}/api/analytics`);
+                const data = await res.json();
+                renderAnalyticsCharts(data);
+            } catch (e) {
+                console.error('Analytics load error:', e);
+            }
+        }
+
+        function renderAnalyticsCharts(data) {
+            const chartDefaults = {
+                plugins: { legend: { labels: { color: '#e0e0e0' } } },
+                scales: {
+                    x: { ticks: { color: '#888' }, grid: { color: '#2a2a2a' } },
+                    y: { ticks: { color: '#888' }, grid: { color: '#2a2a2a' }, beginAtZero: true },
+                },
+                maintainAspectRatio: false,
+            };
+
+            const entryDates = Object.keys(data.entries_over_time || {});
+            renderChart('chart-entries-over-time', {
+                type: 'line',
+                data: {
+                    labels: entryDates.map(d => d.slice(5)),
+                    datasets: [{
+                        label: 'Entries added',
+                        data: entryDates.map(d => data.entries_over_time[d]),
+                        borderColor: '#3b82f6',
+                        backgroundColor: '#3b82f633',
+                        tension: 0.3,
+                        fill: true,
+                    }],
+                },
+                options: { ...chartDefaults, plugins: { legend: { display: false } } },
+            });
+
+            const topTags = data.top_tags || [];
+            renderChart('chart-top-tags', {
+                type: 'bar',
+                data: {
+                    labels: topTags.map(t => t.tag),
+                    datasets: [{
+                        label: 'Uses',
+                        data: topTags.map(t => t.count),
+                        backgroundColor: CHART_COLORS,
+                    }],
+                },
+                options: { ...chartDefaults, plugins: { legend: { display: false } }, indexAxis: 'y' },
+            });
+
+            const searchDates = Object.keys(data.searches_per_day || {});
+            renderChart('chart-searches-per-day', {
+                type: 'bar',
+                data: {
+                    labels: searchDates.map(d => d.slice(5)),
+                    datasets: [{
+                        label: 'Searches',
+                        data: searchDates.map(d => data.searches_per_day[d]),
+                        backgroundColor: '#22c55e',
+                    }],
+                },
+                options: { ...chartDefaults, plugins: { legend: { display: false } } },
+            });
+
+            const sizes = data.collection_sizes || {};
+            const sizeLabels = Object.keys(sizes);
+            renderChart('chart-collection-sizes', {
+                type: 'doughnut',
+                data: {
+                    labels: sizeLabels,
+                    datasets: [{
+                        data: sizeLabels.map(k => sizes[k]),
+                        backgroundColor: CHART_COLORS,
+                    }],
+                },
+                options: {
+                    plugins: { legend: { labels: { color: '#e0e0e0' } } },
+                    maintainAspectRatio: false,
+                },
+            });
         }
     </script>
 </body>
