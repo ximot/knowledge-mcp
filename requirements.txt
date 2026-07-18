@@ -2,7 +2,7 @@
 mcp>=1.0.0
 
 # Vector database
-qdrant-client>=1.7.0
+qdrant-client>=1.17.0
 
 # HTTP client
 httpx>=0.25.0
