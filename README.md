@@ -342,6 +342,9 @@ uv run python knowledge_mcp/http_server.py
 # Lint and format
 uv run ruff check --fix .
 uv run ruff format .
+
+# Run tests
+uv run pytest
 ```
 
 ### Local Setup (pip — alternative)
