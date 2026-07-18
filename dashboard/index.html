@@ -345,12 +345,33 @@
             margin-bottom: 20px;
         }
 
+        .modal-header-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
         .modal-close {
             background: none;
             border: none;
             color: #888;
             font-size: 24px;
             cursor: pointer;
+        }
+
+        .modal-delete {
+            background: none;
+            border: 1px solid #a33;
+            color: #e55;
+            border-radius: 6px;
+            padding: 5px 12px;
+            font-size: 13px;
+            cursor: pointer;
+        }
+
+        .modal-delete:hover {
+            background: #a33;
+            color: #fff;
         }
 
         .modal-body {
@@ -1024,7 +1045,10 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2 id="modal-title">Title</h2>
-                <button class="modal-close" onclick="closeModal()">&times;</button>
+                <div class="modal-header-actions">
+                    <button class="modal-delete" onclick="confirmDeleteDetail()">Delete</button>
+                    <button class="modal-close" onclick="closeModal()">&times;</button>
+                </div>
             </div>
             <div class="modal-body" id="modal-body"></div>
         </div>
@@ -1529,7 +1553,27 @@
         }
 
         // Detail modal
+        let currentDetailItem = null;
+        let currentDetailType = null;
+
+        const DELETE_ENDPOINTS = {
+            knowledge: 'knowledge',
+            skill: 'skills',
+            project: 'projects',
+            private: 'private',
+        };
+
+        const RELOAD_FUNCTIONS = {
+            knowledge: loadKnowledge,
+            skill: loadSkills,
+            project: loadProjects,
+            private: loadPrivate,
+        };
+
         function showDetail(item, type) {
+            currentDetailItem = item;
+            currentDetailType = type;
+
             const modal = document.getElementById('detail-modal');
             let title, body = '';
 
@@ -1587,6 +1631,38 @@
 
         function closeModal() {
             document.getElementById('detail-modal').classList.remove('active');
+        }
+
+        async function confirmDeleteDetail() {
+            if (!currentDetailItem || !currentDetailType) return;
+
+            const item = currentDetailItem;
+            const type = currentDetailType;
+            const label = item.title || item.name || item.id;
+
+            if (!confirm(`Are you sure you want to delete "${label}"? This cannot be undone.`)) {
+                return;
+            }
+
+            const endpoint = DELETE_ENDPOINTS[type];
+            try {
+                const res = await fetch(`${API_BASE}/api/${endpoint}/${encodeURIComponent(item.id)}`, {
+                    method: 'DELETE',
+                });
+                const result = await res.json();
+
+                if (res.ok && result.success) {
+                    showNotification(`Deleted "${label}"`);
+                    closeModal();
+                    const reload = RELOAD_FUNCTIONS[type];
+                    if (reload) reload();
+                    loadStats();
+                } else {
+                    showNotification(result.error || 'Delete failed', true);
+                }
+            } catch (err) {
+                showNotification('Error deleting entry', true);
+            }
         }
 
         // Add forms
