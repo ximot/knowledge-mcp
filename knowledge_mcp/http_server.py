@@ -124,19 +124,31 @@ async def health_check(request):
 # ---------------------------------------------------------------------------
 
 
+def _parse_tags(request) -> list[str]:
+    """Parse a comma-separated ?tags= query param into a list (AND filter)."""
+    raw = request.query_params.get("tags", "")
+    return [t.strip() for t in raw.split(",") if t.strip()]
+
+
 async def api_knowledge(request):
-    """List or search knowledge entries."""
+    """List or search knowledge entries, optionally filtered by tags (AND)."""
     await _qdrant.ensure_collections()
     query = request.query_params.get("q", "")
     limit = min(int(request.query_params.get("limit", "50")), 200)
+    tags = _parse_tags(request)
+    filters = {"tags": tags} if tags else None
 
     if query:
         record_search()
         vector = await get_embeddings(query)
-        results = await _qdrant.search(settings.knowledge_collection, vector, limit=limit)
+        results = await _qdrant.search(
+            settings.knowledge_collection, vector, limit=limit, filters=filters
+        )
         return JSONResponse({"results": results, "count": len(results)})
 
-    results, total = await _qdrant.list_all(settings.knowledge_collection, limit=limit)
+    results, total = await _qdrant.list_all(
+        settings.knowledge_collection, limit=limit, filters=filters
+    )
     return JSONResponse({"results": results, "count": total})
 
 
@@ -169,19 +181,59 @@ async def api_knowledge_add(request):
     return JSONResponse({"success": True, "id": kid})
 
 
+async def api_knowledge_update(request):
+    """Update a knowledge entry via PUT."""
+    entry_id = request.path_params["id"]
+    existing = await _qdrant.get_by_id(settings.knowledge_collection, entry_id)
+    if not existing:
+        return JSONResponse({"success": False, "error": "not found"}, status_code=404)
+
+    body = await request.json()
+    title = body.get("title", existing.get("title", "")).strip()
+    content = body.get("content", existing.get("content", ""))
+    payload = {
+        **existing,
+        "title": title,
+        "content": content,
+        "knowledge_type": body.get("knowledge_type", existing.get("knowledge_type", "note")),
+        "tags": body.get("tags", existing.get("tags", [])),
+        "source": body.get("source", existing.get("source")),
+        "updated_at": datetime.utcnow().isoformat(),
+    }
+    vector = await get_embeddings(f"{title} {content}")
+    await _qdrant.upsert(settings.knowledge_collection, entry_id, vector, payload)
+    return JSONResponse({"success": True, "id": entry_id})
+
+
+async def api_knowledge_delete(request):
+    """Delete a knowledge entry by ID."""
+    entry_id = request.path_params["id"]
+    existing = await _qdrant.get_by_id(settings.knowledge_collection, entry_id)
+    if not existing:
+        return JSONResponse({"success": False, "error": "not found"}, status_code=404)
+    await _qdrant.delete(settings.knowledge_collection, entry_id)
+    return JSONResponse({"success": True, "id": entry_id})
+
+
 async def api_skills(request):
-    """List or search skills."""
+    """List or search skills, optionally filtered by tags (AND)."""
     await _qdrant.ensure_collections()
     query = request.query_params.get("q", "")
     limit = min(int(request.query_params.get("limit", "50")), 200)
+    tags = _parse_tags(request)
+    filters = {"tags": tags} if tags else None
 
     if query:
         record_search()
         vector = await get_embeddings(query)
-        results = await _qdrant.search(settings.skills_collection, vector, limit=limit)
+        results = await _qdrant.search(
+            settings.skills_collection, vector, limit=limit, filters=filters
+        )
         return JSONResponse({"results": results, "count": len(results)})
 
-    results, total = await _qdrant.list_all(settings.skills_collection, limit=limit)
+    results, total = await _qdrant.list_all(
+        settings.skills_collection, limit=limit, filters=filters
+    )
     return JSONResponse({"results": results, "count": total})
 
 
@@ -215,19 +267,59 @@ async def api_skill_add(request):
     return JSONResponse({"success": True, "id": sid})
 
 
+async def api_skill_update(request):
+    """Update a skill via PUT."""
+    entry_id = request.path_params["id"]
+    existing = await _qdrant.get_by_id(settings.skills_collection, entry_id)
+    if not existing:
+        return JSONResponse({"success": False, "error": "not found"}, status_code=404)
+
+    body = await request.json()
+    name = existing.get("name", "")
+    description = body.get("description", existing.get("description", ""))
+    prompt = body.get("prompt", existing.get("prompt", ""))
+    payload = {
+        **existing,
+        "description": description,
+        "prompt": prompt,
+        "tags": body.get("tags", existing.get("tags", [])),
+        "version": body.get("version", existing.get("version", "1.0.0")),
+        "updated_at": datetime.utcnow().isoformat(),
+    }
+    vector = await get_embeddings(f"{name} {description} {prompt}")
+    await _qdrant.upsert(settings.skills_collection, entry_id, vector, payload)
+    return JSONResponse({"success": True, "id": entry_id})
+
+
+async def api_skill_delete(request):
+    """Delete a skill by ID."""
+    entry_id = request.path_params["id"]
+    existing = await _qdrant.get_by_id(settings.skills_collection, entry_id)
+    if not existing:
+        return JSONResponse({"success": False, "error": "not found"}, status_code=404)
+    await _qdrant.delete(settings.skills_collection, entry_id)
+    return JSONResponse({"success": True, "id": entry_id})
+
+
 async def api_projects(request):
-    """List or search projects."""
+    """List or search projects, optionally filtered by tags (AND)."""
     await _qdrant.ensure_collections()
     query = request.query_params.get("q", "")
     limit = min(int(request.query_params.get("limit", "50")), 200)
+    tags = _parse_tags(request)
+    filters = {"tags": tags} if tags else None
 
     if query:
         record_search()
         vector = await get_embeddings(query)
-        results = await _qdrant.search(settings.projects_collection, vector, limit=limit)
+        results = await _qdrant.search(
+            settings.projects_collection, vector, limit=limit, filters=filters
+        )
         return JSONResponse({"results": results, "count": len(results)})
 
-    results, total = await _qdrant.list_all(settings.projects_collection, limit=limit)
+    results, total = await _qdrant.list_all(
+        settings.projects_collection, limit=limit, filters=filters
+    )
     return JSONResponse({"results": results, "count": total})
 
 
@@ -261,19 +353,58 @@ async def api_project_add(request):
     return JSONResponse({"success": True, "id": pid})
 
 
+async def api_project_update(request):
+    """Update a project via PUT."""
+    entry_id = request.path_params["id"]
+    existing = await _qdrant.get_by_id(settings.projects_collection, entry_id)
+    if not existing:
+        return JSONResponse({"success": False, "error": "not found"}, status_code=404)
+
+    body = await request.json()
+    name = existing.get("name", "")
+    description = body.get("description", existing.get("description", ""))
+    payload = {
+        **existing,
+        "path": body.get("path", existing.get("path", "")),
+        "description": description,
+        "status": body.get("status", existing.get("status", "active")),
+        "tags": body.get("tags", existing.get("tags", [])),
+        "updated_at": datetime.utcnow().isoformat(),
+    }
+    vector = await get_embeddings(f"{name} {description}")
+    await _qdrant.upsert(settings.projects_collection, entry_id, vector, payload)
+    return JSONResponse({"success": True, "id": entry_id})
+
+
+async def api_project_delete(request):
+    """Delete a project by ID."""
+    entry_id = request.path_params["id"]
+    existing = await _qdrant.get_by_id(settings.projects_collection, entry_id)
+    if not existing:
+        return JSONResponse({"success": False, "error": "not found"}, status_code=404)
+    await _qdrant.delete(settings.projects_collection, entry_id)
+    return JSONResponse({"success": True, "id": entry_id})
+
+
 async def api_private(request):
-    """List or search private entries."""
+    """List or search private entries, optionally filtered by tags (AND)."""
     await _qdrant.ensure_collections()
     query = request.query_params.get("q", "")
     limit = min(int(request.query_params.get("limit", "50")), 200)
+    tags = _parse_tags(request)
+    filters = {"tags": tags} if tags else None
 
     if query:
         record_search()
         vector = await get_embeddings(query)
-        results = await _qdrant.search(settings.private_collection, vector, limit=limit)
+        results = await _qdrant.search(
+            settings.private_collection, vector, limit=limit, filters=filters
+        )
         return JSONResponse({"results": results, "count": len(results)})
 
-    results, total = await _qdrant.list_all(settings.private_collection, limit=limit)
+    results, total = await _qdrant.list_all(
+        settings.private_collection, limit=limit, filters=filters
+    )
     return JSONResponse({"results": results, "count": total})
 
 
@@ -350,6 +481,39 @@ async def api_analytics(request):
             "collection_sizes": collection_sizes,
         }
     )
+
+
+async def api_private_update(request):
+    """Update a private entry via PUT."""
+    entry_id = request.path_params["id"]
+    existing = await _qdrant.get_by_id(settings.private_collection, entry_id)
+    if not existing:
+        return JSONResponse({"success": False, "error": "not found"}, status_code=404)
+
+    body = await request.json()
+    title = body.get("title", existing.get("title", "")).strip()
+    content = body.get("content", existing.get("content", ""))
+    payload = {
+        **existing,
+        "title": title,
+        "content": content,
+        "private_type": body.get("private_type", existing.get("private_type", "note")),
+        "tags": body.get("tags", existing.get("tags", [])),
+        "updated_at": datetime.utcnow().isoformat(),
+    }
+    vector = await get_embeddings(f"{title} {content}")
+    await _qdrant.upsert(settings.private_collection, entry_id, vector, payload)
+    return JSONResponse({"success": True, "id": entry_id})
+
+
+async def api_private_delete(request):
+    """Delete a private entry by ID."""
+    entry_id = request.path_params["id"]
+    existing = await _qdrant.get_by_id(settings.private_collection, entry_id)
+    if not existing:
+        return JSONResponse({"success": False, "error": "not found"}, status_code=404)
+    await _qdrant.delete(settings.private_collection, entry_id)
+    return JSONResponse({"success": True, "id": entry_id})
 
 
 async def api_stats(request):
@@ -439,6 +603,22 @@ async def api_graph(request):
     for (a, b), tags in edge_map.items():
         edges.append({"from": a, "to": b, "tags": tags})
 
+    # Tag hub nodes, one per tag, connected to every item carrying that tag —
+    # lets the dashboard offer "click a tag to filter" on the graph view.
+    for tag, count in tag_stats.items():
+        nodes.append(
+            {
+                "id": f"tag:{tag}",
+                "label": f"#{tag}",
+                "type": "tag",
+                "tag": tag,
+                "count": count,
+            }
+        )
+    for tag, node_ids in tag_to_node_ids.items():
+        for node_id in node_ids:
+            edges.append({"from": f"tag:{tag}", "to": node_id, "tags": [tag], "isTagEdge": True})
+
     return JSONResponse(
         {
             "nodes": nodes,
@@ -489,12 +669,20 @@ def main():
         # Dashboard REST API
         Route("/api/knowledge", api_knowledge, methods=["GET"]),
         Route("/api/knowledge", api_knowledge_add, methods=["POST"]),
+        Route("/api/knowledge/{id}", api_knowledge_update, methods=["PUT"]),
+        Route("/api/knowledge/{id}", api_knowledge_delete, methods=["DELETE"]),
         Route("/api/skills", api_skills, methods=["GET"]),
         Route("/api/skills", api_skill_add, methods=["POST"]),
+        Route("/api/skills/{id}", api_skill_update, methods=["PUT"]),
+        Route("/api/skills/{id}", api_skill_delete, methods=["DELETE"]),
         Route("/api/projects", api_projects, methods=["GET"]),
         Route("/api/projects", api_project_add, methods=["POST"]),
+        Route("/api/projects/{id}", api_project_update, methods=["PUT"]),
+        Route("/api/projects/{id}", api_project_delete, methods=["DELETE"]),
         Route("/api/private", api_private, methods=["GET"]),
         Route("/api/private", api_private_add, methods=["POST"]),
+        Route("/api/private/{id}", api_private_update, methods=["PUT"]),
+        Route("/api/private/{id}", api_private_delete, methods=["DELETE"]),
         Route("/api/stats", api_stats, methods=["GET"]),
         Route("/api/graph", api_graph, methods=["GET"]),
         Route("/api/analytics", api_analytics, methods=["GET"]),
