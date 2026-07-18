@@ -13,13 +13,13 @@ Works with Claude Code, OpenCode, and any MCP-compatible client. Powered by Qdra
 ### 1.1 Remove local/private configuration
 - [x] `knowledge_mcp/config.py` — Remove any hardcoded IPs (e.g., `192.168.1.9`), make everything env-driven
 - [x] `knowledge_mcp/rest_api.py` — Removed (n8n integration = later)
-- [ ] `knowledge-rest-api.service` — Remove (related to wrapper)
-- [ ] `start-rest-api.sh` — Remove (related to wrapper)
-- [ ] `wrapper.log` — Remove (should be gitignored)
-- [ ] `knowledge-mcp.service` — Keep as example, rename to `knowledge-mcp.service.example`
-- [ ] `.claude/` — Remove from repo (local Claude Code settings)
-- [ ] `__pycache__/` dirs — Remove, add to `.gitignore`
-- [ ] `.venv/` — Remove from repo, add to `.gitignore`
+- [x] `knowledge-rest-api.service` — Removed
+- [x] `start-rest-api.sh` — Removed
+- [x] `wrapper.log` — Gitignored, not tracked
+- [x] `knowledge-mcp.service` — Renamed to `scripts/knowledge-mcp.service.example`
+- [x] `.claude/` — Not tracked (gitignored)
+- [x] `__pycache__/` dirs — Not tracked, gitignored
+- [x] `.venv/` — Not tracked, gitignored
 
 ### 1.2 Translate Polish → English
 - [x] `knowledge_mcp/server.py` — Translate all Polish comments/docstrings
@@ -133,9 +133,9 @@ MCP_PORT=8765
 ## Phase 5: Repository Setup (Priority: HIGH)
 
 ### 5.1 Git housekeeping
-- [ ] `.gitignore` — Python, Docker, IDE files, `.env`, `__pycache__`, `.venv`, logs
-- [ ] Remove tracked files that should be ignored (`.venv/`, `__pycache__/`, `wrapper.log`, `.claude/`)
-- [ ] Clean git history if needed (remove any secrets/IPs from history)
+- [x] `.gitignore` — Python, Docker, IDE files, `.env`, `__pycache__`, `.venv`, logs
+- [x] Remove tracked files that should be ignored (`.venv/`, `__pycache__/`, `wrapper.log`, `.claude/`)
+- [ ] Clean git history if needed — old commits still contain a private LAN IP (`192.168.1.9`) in `scripts/start.sh` history; not a secret, low priority, left as-is
 
 ### 5.2 GitHub repo structure (done — matches target layout)
 ```
@@ -169,7 +169,7 @@ knowledge-mcp/
 - [x] `LICENSE` — MIT
 - [x] `CONTRIBUTING.md` — basic contribution guidelines
 - [x] `pyproject.toml` — proper Python package metadata
-- [ ] `.github/workflows/ci.yml` — basic CI (lint, type check, Docker build test)
+- [x] `.github/workflows/ci.yml` — lint, typecheck, Docker build, GHCR publish on tag push
 
 ---
 
@@ -180,10 +180,11 @@ knowledge-mcp/
 - [x] Verify docker-compose.yml and docker-compose.external.yml are valid YAML
 - [x] Verify Dockerfile syntax (multi-stage build, labels, healthcheck)
 - [x] Verify pyproject.toml is valid and has description + repo URLs
-- [ ] Ensure `docker compose up` works from clean state
-- [ ] Test MCP connection from Claude Code
-- [ ] Test all 24 tools (CRUD for each collection)
-- [ ] Test import_skills.py with sample SKILL.md files
+- [ ] **No automated test suite exists** — no `tests/` directory anywhere in the repo; CI only runs lint + typecheck. In progress, see Phase 7.
+- [ ] Ensure `docker compose up` works from clean state (manual, needs live Qdrant/Ollama)
+- [ ] Test MCP connection from Claude Code (manual)
+- [ ] Test all 24 tools (CRUD for each collection) — being covered by automated tests, see Phase 7
+- [ ] Test import_skills.py with sample SKILL.md files (manual)
 
 ### 6.2 Sample data
 - [x] Add `examples/` directory with sample SKILL.md files for import
@@ -194,11 +195,31 @@ knowledge-mcp/
 - [x] Verify .gitignore covers Python, Docker, IDE, .env, logs, etc.
 - [x] Verify pyproject.toml has repo description and URLs
 - [x] Final README review — Quick Start, project structure updated
-- [ ] Create GitHub repo: `ximot/knowledge-mcp`
-- [ ] Push clean code
-- [ ] Add repo description + topics (mcp, rag, knowledge-base, qdrant, ollama, claude-code)
-- [ ] Create initial release tag (v0.1.0)
-- [ ] Optional: publish Docker image to GHCR
+- [x] Create GitHub repo: `ximot/knowledge-mcp`
+- [x] Push clean code
+- [x] Add repo description + topics (ai-tools, claude-code, knowledge-base, mcp, ollama, qdrant, rag, vector-database)
+- [x] Create initial release tag (v0.1.0)
+- [x] Publish Docker image to GHCR — automated in CI on tag push
+
+---
+
+## Phase 7: Post-v0.1.0 Hardening (Priority: HIGH) — status as of 2026-07-14
+
+v0.1.0 shipped and Phases 1-6 above are effectively complete (this checklist was stale — verified against actual repo state on 2026-07-14). Real remaining work:
+
+### 7.1 Automated tests
+- [ ] Add `tests/` with pytest covering `config.py`, `qdrant.py`, `embeddings.py`, and Pydantic input validation in `server.py`
+- [ ] Wire `pytest` into `.github/workflows/ci.yml`
+
+### 7.2 Dashboard enhancements (open GitHub issues)
+- [ ] #6 delete with confirmation (medium)
+- [ ] #5 inline edit for entries (medium)
+- [ ] #7 tag filtering from graph (medium)
+- [ ] #8 responsive mobile layout (medium)
+- [ ] #9 auto-refresh stats (medium)
+- [ ] #10 import/export functionality (ambitious)
+- [ ] #11 MCP playground / tool tester (ambitious)
+- [ ] #12 usage analytics and charts (ambitious)
 
 ---
 
